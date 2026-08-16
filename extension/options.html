@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Web Clipper 扩展设置</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 20px; max-width: 480px; }
+      label { display: block; margin-bottom: 12px; font-size: 13px; }
+      input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #dcdfe6; border-radius: 4px; }
+      button { padding: 8px 20px; border: none; border-radius: 4px; background: #409eff; color: #fff; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h2>Web Clipper 扩展设置</h2>
+    <label>服务器地址 <input id="server" placeholder="http://localhost:3001" /></label>
+    <label>API Token <input id="token" type="password" /></label>
+    <button id="save">保存</button>
+    <p id="status"></p>
+    <script>
+      const server = document.getElementById('server');
+      const token = document.getElementById('token');
+      const status = document.getElementById('status');
+
+      chrome.storage.local.get(['server', 'token'], (data) => {
+        if (data.server) server.value = data.server;
+        if (data.token) token.value = data.token;
+      });
+
+      document.getElementById('save').addEventListener('click', () => {
+        chrome.storage.local.set({ server: server.value.trim(), token: token.value.trim() }, () => {
+          status.textContent = '已保存';
+        });
+      });
+    </script>
+  </body>
+</html>

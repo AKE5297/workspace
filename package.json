@@ -1,0 +1,10 @@
+{
+  "name": "web-clipper",
+  "version": "1.0.0",
+  "description": "Web Clipper 网页剪藏工具",
+  "private": true,
+  "scripts": {
+    "start": "bash start.sh",
+    "setup:icons": "node scripts/gen-icons.mjs"
+  }
+}

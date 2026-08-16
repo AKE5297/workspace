@@ -111,6 +111,9 @@
 *.pem
 *.key
 
+# Runtime data (JSON file storage)
+backend/data/
+
 # Temporary files
 *.tmp
 *.temp

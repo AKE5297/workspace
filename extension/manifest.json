@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Web Clipper",
+  "version": "1.0.0",
+  "description": "一键保存当前页面到 Web Clipper 剪藏工具",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": ["http://localhost:5173/*", "http://localhost:3001/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "保存到 Web Clipper",
+    "default_icon": {
+      "192": "icon-192.png"
+    }
+  },
+  "icons": {
+    "192": "icon-192.png",
+    "512": "icon-512.png"
+  },
+  "options_page": "options.html"
+}

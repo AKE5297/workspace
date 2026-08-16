@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: web-clipper
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DATA_DIR=/app/backend/data
+      - USER_LLM_API_KEY=${USER_LLM_API_KEY:-}
+      - USER_LLM_BASE_URL=${USER_LLM_BASE_URL:-https://api.deepseek.com/v1}
+      - USER_LLM_MODEL=${USER_LLM_MODEL:-deepseek-chat}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    volumes:
+      - wc_data:/app/backend/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  wc_data:
