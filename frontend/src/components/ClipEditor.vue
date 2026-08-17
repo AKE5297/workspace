@@ -98,10 +98,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { clipApi, tagApi } from '@/api';
+import { clipApi, tagApi, extractApi } from '@/api';
 import { useSettingsStore } from '@/stores/settings';
 import { useLocalDrafts } from '@/stores/localDrafts';
-import { extractFromHtml } from '@/utils/extractor';
 
 const props = defineProps({
   clipId: { type: String, default: null },
@@ -164,16 +163,20 @@ async function fetchPage() {
   if (!form.url) return ElMessage.warning('请先输入 URL');
   fetching.value = true;
   try {
-    const resp = await fetch(form.url, { mode: 'cors' });
-    const html = await resp.text();
-    const result = extractFromHtml(html, form.url);
-    form.title = result.title || form.title;
-    form.author = result.author || form.author;
-    form.text = result.text || form.text;
-    form.content = result.content || form.content;
-    ElMessage.success('内容抓取成功');
+    const { data } = await extractApi.extract(form.url);
+    form.url = data.url || form.url;
+    form.title = data.title || form.title;
+    form.author = data.author || form.author;
+    form.text = data.text || form.text;
+    form.content = data.content || form.content;
+    if (form.title && form.text) {
+      ElMessage.success('内容抓取成功');
+    } else {
+      ElMessage.warning('抓取到页面但未能提取正文，请检查内容后手动补充');
+    }
   } catch (e) {
-    ElMessage.warning('无法直接抓取该页面，请手动填写内容');
+    const msg = e.response?.data?.message || '无法抓取该链接，请手动填写内容';
+    ElMessage.warning(msg);
   } finally {
     fetching.value = false;
   }

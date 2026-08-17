@@ -21,6 +21,7 @@ import batchRoutes from './routes/batch.js';
 import rssRoutes from './routes/rss.js';
 import settingsRoutes from './routes/settings.js';
 import uploadRoutes from './routes/uploads.js';
+import extractRoutes from './routes/extract.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/recycle', recycleRoutes);
 app.use('/api/batch', batchRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/extract', extractRoutes);
 app.use('/rss', rssRoutes);
 
 app.get('/api/health', (req, res) => {

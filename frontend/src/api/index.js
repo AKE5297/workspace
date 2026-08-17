@@ -76,3 +76,7 @@ export const uploadApi = {
     });
   }
 };
+
+export const extractApi = {
+  extract: (url) => api.post('/extract', { url })
+};
