@@ -14,9 +14,7 @@ function getSettings() {
 
 async function callLLM(messages, maxTokens = 500) {
   const apiKey = config.llm.apiKey;
-  if (!apiKey) {
-    throw new Error('LLM_API_KEY 未配置');
-  }
+  if (!apiKey) return '';
   const resp = await axios.post(
     `${config.llm.baseUrl}/chat/completions`,
     {

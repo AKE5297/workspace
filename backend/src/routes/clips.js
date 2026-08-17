@@ -61,7 +61,7 @@ router.get('/:id', (req, res) => {
   const clip = getDb().clips.find((c) => c.id === req.params.id && c.userId === req.user.id);
   if (!clip) return res.status(404).json({ message: '剪藏不存在' });
   const full = clipService.getClipFull(req.params.id) || clip;
-  res.json(clipService.publicClip(full));
+  res.json(full);
 });
 
 router.post('/', async (req, res) => {

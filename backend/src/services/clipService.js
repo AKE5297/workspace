@@ -96,10 +96,17 @@ export function recordRead(id) {
   const db = getDb();
   const idx = db.clips.findIndex((c) => c.id === id);
   if (idx < 0) return;
-  db.clips[idx].readCount = (db.clips[idx].readCount || 0) + 1;
-  db.clips[idx].lastReadAt = now();
+  const clip = db.clips[idx];
+  clip.readCount = (clip.readCount || 0) + 1;
+  clip.lastReadAt = now();
+  const full = readClipFile(id);
+  if (full) {
+    full.readCount = clip.readCount;
+    full.lastReadAt = clip.lastReadAt;
+    writeClipFile(id, full);
+  }
   const reads = db.readLogs || (db.readLogs = []);
-  reads.push({ clipId: id, userId: db.clips[idx].userId, at: now(), mode: 'detail' });
+  reads.push({ clipId: id, userId: clip.userId, at: now(), mode: 'detail' });
   if (reads.length > 20000) reads.splice(0, reads.length - 20000);
 }
 
