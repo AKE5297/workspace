@@ -26,14 +26,34 @@ function decodeBuffer(buffer, charset) {
 }
 
 function absolutizeImages(html, baseUrl) {
-  return String(html).replace(/<(img|source)[^>]+src=["']([^"']+)["']/gi, (m, tag, src) => {
-    if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:')) return m;
-    try {
-      const abs = new URL(src, baseUrl).href;
-      return m.replace(src, abs);
-    } catch (e) {
-      return m;
+  return String(html).replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
+    let newAttrs = attrs;
+
+    const dataSrcMatch = /\sdata-src=["']([^"']+)["']/i.exec(attrs);
+    const srcMatch = /\ssrc=["']([^"']*)["']/i.exec(attrs);
+    const hasRealSrc = srcMatch && srcMatch[1] && !/^data:/i.test(srcMatch[1]);
+
+    const absolutize = (u) => {
+      if (/^(https?:)?\/\//i.test(u) || u.startsWith('data:')) return u;
+      try {
+        return new URL(u, baseUrl).href;
+      } catch (e) {
+        return u;
+      }
+    };
+
+    if (dataSrcMatch) {
+      const dsrc = absolutize(dataSrcMatch[1]);
+      newAttrs = newAttrs.replace(dataSrcMatch[0], ` data-src="${dsrc}"`);
+      if (!hasRealSrc) {
+        newAttrs += ` src="${dsrc}"`;
+      }
+    } else if (srcMatch && !hasRealSrc) {
+      const src = absolutize(srcMatch[1]);
+      newAttrs = newAttrs.replace(srcMatch[0], ` src="${src}"`);
     }
+
+    return `<${tag}${newAttrs}>`;
   });
 }
 
@@ -154,8 +174,8 @@ export async function extractFromUrl(url) {
   content = absolutizeImages(content, finalUrl);
 
   if (images.length < 3) {
-    const imgs = [...document.querySelectorAll('img[src]')]
-      .map((img) => img.getAttribute('src'))
+    const imgs = [...document.querySelectorAll('img[src], img[data-src]')]
+      .map((img) => img.getAttribute('src') || img.getAttribute('data-src'))
       .filter((s) => /^https?:\/\//i.test(s) && !/logo|icon|avatar/i.test(s))
       .slice(0, 3 - images.length);
     images.push(...imgs);
