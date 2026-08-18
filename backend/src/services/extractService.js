@@ -65,6 +65,71 @@ function isWeixin(url) {
   return /mp\.weixin\.qq\.com/i.test(url);
 }
 
+const WAF_PATTERNS = [
+  { re: /zse-ck|_zap|zst\d/i, name: '知乎反爬验证' },
+  { re: /waf_js|wafchallenge|_wafchallengeid/i, name: '字节跳动 WAF 验证' },
+  { re: /TCaptcha|WafCaptcha|captcha\.qq\.com/i, name: '腾讯云验证码' },
+  { re: /probe\.js\?v=/i, name: '腾讯安全验证' },
+  { re: /secs\.hwcdn|hwcdn/i, name: '网宿 WAF' }
+];
+
+function detectWaf(html, status) {
+  if (!html) return null;
+  if (status === 403 || status === 202) {
+    for (const p of WAF_PATTERNS) {
+      if (p.re.test(html)) return p.name;
+    }
+  }
+  if (html.includes('__captcha') || html.includes('安全验证') || html.includes('滑动验证')) {
+    return '站点安全验证';
+  }
+  return null;
+}
+
+const SPA_JSON_SELECTORS = [
+  {
+    sel: 'script#__NEXT_DATA__',
+    key: 'props.pageProps',
+    textPath: ['articleBody', 'content', 'body']
+  },
+  {
+    sel: 'script#__NUXT_DATA__',
+    isNuxt: true
+  },
+  {
+    sel: 'script#js-initialData',
+    key: 'initialState',
+    textPath: []
+  },
+  {
+    sel: 'script[data-name="content"]'
+  }
+];
+
+function tryExtractSpaJson(document) {
+  for (const { sel, key, isNuxt } of SPA_JSON_SELECTORS) {
+    const el = document.querySelector(sel);
+    if (!el || !el.textContent) continue;
+    try {
+      const data = JSON.parse(el.textContent);
+      let payload = data;
+      if (key && data) {
+        for (const k of key.split('.')) payload = payload?.[k];
+      }
+      const text = JSON.stringify(payload || data);
+      if (text.length > 200) {
+        return {
+          title: data?.title || document.title || '',
+          text
+        };
+      }
+    } catch (e) {
+      /* 非 JSON 则跳过 */
+    }
+  }
+  return null;
+}
+
 // 微信公众号文章正文在 #js_content 中，Readability 提取效果不稳定，做专项处理
 function extractWeixin(document) {
   const titleEl = document.querySelector('#activity-name')
@@ -102,13 +167,18 @@ export async function extractFromUrl(url) {
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
     },
-    validateStatus: (s) => s < 400
+    validateStatus: (s) => s < 400 || s === 403 || s === 202 || s === 429
   });
 
   const contentType = resp.headers['content-type'] || '';
   const charset = detectCharset(contentType, Buffer.from(resp.data));
   const html = decodeBuffer(Buffer.from(resp.data), charset);
   const finalUrl = resp.request?.res?.responseUrl || url;
+
+  const waf = detectWaf(html, resp.status);
+  if (waf) {
+    throw new Error(`${waf}拦截，请在浏览器中打开后使用扩展剪藏`);
+  }
 
   const dom = new JSDOM(html, { url: finalUrl });
   const document = dom.window.document;
@@ -168,6 +238,14 @@ export async function extractFromUrl(url) {
       }
     } catch (e) {
       /* Readability 失败时回退 */
+    }
+  }
+  if (!text) {
+    const spa = tryExtractSpaJson(document);
+    if (spa) {
+      title = spa.title || title;
+      text = spa.text;
+      content = html;
     }
   }
   if (!text) {

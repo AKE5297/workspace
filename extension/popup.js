@@ -40,10 +40,49 @@ async function capturePage() {
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
-      const text = document.body?.innerText || '';
-      const title = document.title || '';
+      const doc = document;
+      const text = doc.body?.innerText || '';
+      const title = doc.title || '';
       const url = location.href;
-      return { text, title, url };
+
+      const pick = (selectors) => {
+        for (const s of selectors) {
+          const el = doc.querySelector(s);
+          if (el && el.textContent.trim().length > 100) return el;
+        }
+        return null;
+      };
+
+      const articleEl = pick([
+        'article',
+        '[class*="article-content"]',
+        '[class*="article_content"]',
+        '[class*="post-content"]',
+        '[class*="RichText"]',
+        '.rich_media_content',
+        '#js_content',
+        '[class*="content"]'
+      ]);
+
+      let content = '';
+      let articleText = '';
+      if (articleEl) {
+        content = articleEl.innerHTML || '';
+        articleText = articleEl.innerText || '';
+      }
+
+      const images = [];
+      doc.querySelectorAll('img[src], img[data-src], img[data-original]').forEach((img) => {
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original');
+        if (src && /^https?:\/\//i.test(src) && !/logo|icon|avatar/i.test(src) && images.length < 20) {
+          images.push(src);
+        }
+      });
+
+      const imgSrcs = [...new Set(images)];
+      const articleUrl = articleEl ? [...articleEl.querySelectorAll('img')].map((i) => i.currentSrc || i.src).filter((s) => /^https?:\/\//i.test(s)) : [];
+
+      return { text, title, url, content, articleText, images: imgSrcs };
     }
   });
   return results?.[0]?.result || null;
@@ -66,7 +105,9 @@ saveBtn.addEventListener('click', async () => {
     const payload = {
       title: titleInput.value.trim() || page?.title || '未命名剪藏',
       url: page?.url || '',
-      text: textInput.value.trim() || page?.text || '',
+      text: textInput.value.trim() || page?.articleText || page?.text || '',
+      content: page?.content || '',
+      images: page?.images || [],
       notebookId: notebookSelect.value || null
     };
     const res = await fetch(`${server}/api/clips`, {

@@ -29,6 +29,13 @@ export const useSettingsStore = defineStore('settings', {
       root.style.setProperty('--wc-color-light', this.lighten(this.themeColor, 30));
       root.style.setProperty('--wc-color-lighter', this.lighten(this.themeColor, 55));
       root.style.setProperty('--wc-color-dark', this.darken(this.themeColor, 15));
+      root.style.setProperty('--el-color-primary', this.themeColor);
+      root.style.setProperty('--el-color-primary-light-3', this.lighten(this.themeColor, 30));
+      root.style.setProperty('--el-color-primary-light-5', this.lighten(this.themeColor, 50));
+      root.style.setProperty('--el-color-primary-light-7', this.lighten(this.themeColor, 70));
+      root.style.setProperty('--el-color-primary-light-8', this.lighten(this.themeColor, 80));
+      root.style.setProperty('--el-color-primary-light-9', this.lighten(this.themeColor, 90));
+      root.style.setProperty('--el-color-primary-dark-2', this.darken(this.themeColor, 20));
       const meta = document.getElementById('meta-theme-color');
       if (meta) meta.content = this.themeColor;
     },
