@@ -43,8 +43,8 @@
           <p>{{ clip.summary }}</p>
         </div>
 
-        <el-divider v-if="readingMode && clip.content" />
-        <div v-if="readingMode && clip.content" class="reader-html" v-html="clip.content"></div>
+        <el-divider v-if="clip.content" />
+        <div v-if="clip.content" class="reader-html" :class="{ 'reading-mode': readingMode }" v-html="clip.content"></div>
 
         <div v-else-if="clip.text" class="plain-text" v-html="renderText"></div>
       </div>

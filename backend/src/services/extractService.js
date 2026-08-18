@@ -53,6 +53,10 @@ function absolutizeImages(html, baseUrl) {
       newAttrs = newAttrs.replace(srcMatch[0], ` src="${src}"`);
     }
 
+    if (tag === 'img' && !/referrerpolicy=/i.test(newAttrs)) {
+      newAttrs += ' referrerpolicy="no-referrer"';
+    }
+
     return `<${tag}${newAttrs}>`;
   });
 }
