@@ -49,7 +49,9 @@ chmod +x start.sh
 ./start.sh
 ```
 
-启动后访问 `http://localhost:5173`，后端 API 运行在 `http://localhost:3001`。
+启动后访问 `http://localhost:5173` 即可使用全部功能，前端开发服务器会自动将 `/api`、`/rss`、`/uploads` 请求代理到后端。
+
+后端 API 运行在 `http://localhost:3001`，**仅提供接口服务，不托管前端页面**，请统一通过 5173 端口访问网站。若需要在后端直接托管构建产物（单端口部署），可设置 `SERVE_DIST=true` 启动后端。
 
 首次使用请先在页面注册账号。可配置的 AI 与推送功能需要修改 `backend/.env`：
 
