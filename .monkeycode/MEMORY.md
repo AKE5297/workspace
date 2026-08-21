@@ -46,4 +46,6 @@ Entries discovered by the Agent during task execution should follow this format:
   - 知乎（403 zse_ck 签名）、什么值得买（202 腾讯 WAF）、掘金（字节 WAFJS）等反爬站点纯 HTTP 抓取无解
   - 反爬站点抓取方案：使用 extension/ 浏览器扩展读取已加载页面 DOM（capturePage 已抓 content + images）
   - extractService 已内置 WAF 挑战页识别，失败时返回"请在浏览器中打开后使用扩展剪藏"提示
+  - extractService 有 SITE_ADAPTERS 站点专项表（CSDN/博客园/简书/掘金/IT之家/少数派/阮一峰/微信）+ JSON-LD 解析兜底，新增平台抓取适配应扩展该表
+  - 简书等 SPA 站点正文纯 JS 渲染，服务端只能拿到摘要，完整正文需扩展剪藏
   - 后端 JSON 文件存储于 backend/data/，测试后需清理数据（测试账号/剪藏）
