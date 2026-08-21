@@ -6,6 +6,13 @@
           <el-input v-model="form.url" placeholder="输入或粘贴要剪藏的页面 URL" @blur="checkDuplicate" />
           <el-button v-if="form.url" @click="fetchPage" :loading="fetching">抓取内容</el-button>
         </div>
+        <div v-if="wafHint" class="waf-hint">
+          <el-alert type="info" :closable="false" show-icon>
+            <template #title>
+              该站点有反爬验证，服务端无法直接抓取。建议安装浏览器扩展，在文章页面点击扩展图标即可一键剪藏（含完整正文和图片）。
+            </template>
+          </el-alert>
+        </div>
         <div v-if="duplicateInfo" class="dup-warning">
           <el-alert type="warning" :closable="false" show-icon>
             <template #title>
@@ -125,6 +132,7 @@ const form = reactive({
 const fetching = ref(false);
 const saving = ref(false);
 const duplicateInfo = ref(null);
+const wafHint = ref(false);
 const cancelByDup = ref(false);
 const recommendedTags = ref([]);
 const aiTagLoading = ref(false);
@@ -176,6 +184,7 @@ async function fetchPage() {
     }
   } catch (e) {
     const msg = e.response?.data?.message || '无法抓取该链接，请手动填写内容';
+    wafHint.value = msg.includes('扩展剪藏');
     ElMessage.warning(msg);
   } finally {
     fetching.value = false;
@@ -317,6 +326,9 @@ function formatDate(iso) {
   display: flex;
   gap: 8px;
   width: 100%;
+}
+.waf-hint {
+  margin-top: 8px;
 }
 .dup-warning {
   margin-top: 8px;

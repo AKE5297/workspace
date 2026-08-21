@@ -69,6 +69,18 @@ async function capturePage() {
       if (articleEl) {
         content = articleEl.innerHTML || '';
         articleText = articleEl.innerText || '';
+        content = content.replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
+          let na = attrs;
+          const dsrc = /\sdata-src=["']([^"']+)["']/i.exec(attrs);
+          const src = /\ssrc=["']([^"']*)["']/i.exec(attrs);
+          if (dsrc && (!src || !src[1])) {
+            na = na.replace(dsrc[0], ` data-src="${dsrc[1]}" src="${dsrc[1]}"`);
+          }
+          if (tag === 'img' && !/referrerpolicy=/i.test(na)) {
+            na += ' referrerpolicy="no-referrer"';
+          }
+          return `<${tag}${na}>`;
+        });
       }
 
       const images = [];

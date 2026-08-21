@@ -65,6 +65,140 @@ function isWeixin(url) {
   return /mp\.weixin\.qq\.com/i.test(url);
 }
 
+// 站点专项提取：优先于通用选择器，针对已知平台使用其专属 DOM 结构
+const SITE_ADAPTERS = [
+  {
+    name: 'CSDN',
+    match: /blog\.csdn\.net\/.+?\/article\/details/i,
+    title: ['h1.title-article'],
+    author: ['.name[username]', 'a.follow-nickName', '[class*="nick-name"]'],
+    content: ['#article_content', '#content_views'],
+    textPath: []
+  },
+  {
+    name: '博客园',
+    match: /cnblogs\.com\/.+?\/(p|article|archive)\//i,
+    title: ['#cb_post_title_url', 'h1.postTitle', 'h1'],
+    author: ['#post-date a', '.postDesc a', '.day .postMeta a'],
+    content: ['#cnblogs_post_body'],
+    textPath: []
+  },
+  {
+    name: '简书',
+    match: /jianshu\.com\/p\//i,
+    title: ['h1'],
+    author: ['a.author', '.author .name'],
+    content: ['article', '.article'],
+    textPath: []
+  },
+  {
+    name: '掘金',
+    match: /juejin\.cn\/(post|article)\//i,
+    title: ['h1.article-title', 'h1'],
+    author: ['.author-name'],
+    content: ['#article-container', '.article-content', '.markdown-body'],
+    textPath: []
+  },
+  {
+    name: 'IT之家',
+    match: /ithome\.com/i,
+    title: ['h1', '#sing_title'],
+    author: ['#author_baidu', '.aName', 'meta[name="author"]'],
+    content: ['#paragraph', '.post_content', 'article'],
+    textPath: []
+  },
+  {
+    name: '少数派',
+    match: /sspai\.com\/post\//i,
+    title: ['h1.title', 'h1'],
+    author: ['.tag-owner-name', '.author'],
+    content: ['div.content', '.article-content'],
+    textPath: []
+  },
+  {
+    name: '阮一峰',
+    match: /ruanyifeng\.com\/blog/i,
+    title: ['h1', '.article-title'],
+    author: [],
+    content: ['#main-content', 'article'],
+    textPath: []
+  },
+  {
+    name: '微信公众号',
+    match: /mp\.weixin\.qq\.com/i,
+    title: ['#activity-name', '.rich_media_title'],
+    author: ['#js_name', '.rich_media_meta_nickname'],
+    content: ['#js_content', '.rich_media_content'],
+    textPath: []
+  }
+];
+
+function matchAdapter(url) {
+  for (const a of SITE_ADAPTERS) {
+    if (a.match.test(url)) return a;
+  }
+  return null;
+}
+
+function pickText(document, selectors) {
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    const t = el?.textContent?.trim();
+    if (t) return t;
+  }
+  return '';
+}
+
+function pickElement(document, selectors) {
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+  return null;
+}
+
+function cleanAuthor(raw) {
+  let a = String(raw || '').trim();
+  a = a.replace(/^作者[:：]\s*/i, '').replace(/^posted\s*@\s*/i, '').replace(/^编辑[:：]\s*/i, '');
+  return a.trim();
+}
+
+function extractSiteMeta(adapter, document, fallback) {
+  const meta = { title: '', author: '', text: '', content: '' };
+  if (adapter.title.length) meta.title = pickText(document, adapter.title);
+  if (adapter.author.length) {
+    const el = pickElement(document, adapter.author);
+    if (el) {
+      const text = el.textContent?.trim();
+      const byAttr = el.getAttribute('content') || el.getAttribute('data-name');
+      meta.author = cleanAuthor((text && text.length <= 30 ? text : '') || byAttr || el.getAttribute('username') || '');
+    }
+  }
+  const contentEl = pickElement(document, adapter.content);
+  if (contentEl) {
+    meta.content = contentEl.innerHTML || '';
+    meta.text = contentEl.textContent || '';
+  }
+  if (!meta.title) meta.title = fallback.title;
+  if (!meta.author && adapter.author.length) meta.author = fallback.author;
+  return meta;
+}
+
+// 从 URL 提取用户名作为站点专项兜底（如博客园 cnblogs.com/cmt/p/xxx、简书 jianshu.com/p/xxx）
+function extractAuthorFromUrl(url, adapterName) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (adapterName === '博客园' && parts[0] && !['p', 'article', 'archive'].includes(parts[0])) {
+      return parts[0];
+    }
+    if (adapterName === '简书' && parts[0] === 'p') return '';
+  } catch (e) {
+    /* ignore */
+  }
+  return '';
+}
+
 const WAF_PATTERNS = [
   { re: /zse-ck|_zap|zst\d/i, name: '知乎反爬验证' },
   { re: /waf_js|wafchallenge|_wafchallengeid/i, name: '字节跳动 WAF 验证' },
@@ -122,6 +256,34 @@ function tryExtractSpaJson(document) {
           title: data?.title || document.title || '',
           text
         };
+      }
+    } catch (e) {
+      /* 非 JSON 则跳过 */
+    }
+  }
+  return null;
+}
+
+// 解析 JSON-LD Article 结构（简书、语雀、多数现代站点均提供），提取 title/author/正文
+function tryExtractJsonLd(document) {
+  const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  for (const s of scripts) {
+    try {
+      const data = JSON.parse(s.textContent);
+      const nodes = Array.isArray(data) ? data : [data];
+      for (const node of nodes) {
+        const article = node['@type'] === 'Article' || (Array.isArray(node['@type']) && node['@type'].includes('Article')) ? node : null;
+        if (!article) continue;
+        const text = article.articleBody
+          || (Array.isArray(article.articleSection) ? article.articleSection.join(' ') : article.articleSection)
+          || (article.description && article.description.length > 100 ? article.description : '');
+        const title = article.headline || article.name || '';
+        const author = article.author
+          ? (typeof article.author === 'string' ? article.author : article.author.name || '')
+          : '';
+        if (text && text.length > 100) {
+          return { title, author, text };
+        }
       }
     } catch (e) {
       /* 非 JSON 则跳过 */
@@ -201,7 +363,7 @@ export async function extractFromUrl(url) {
   for (const sel of authorSelectors) {
     const el = document.querySelector(sel);
     if (el) {
-      author = el.getAttribute('content') || el.textContent.trim();
+      author = cleanAuthor(el.getAttribute('content') || el.textContent.trim());
       if (author) break;
     }
   }
@@ -219,6 +381,24 @@ export async function extractFromUrl(url) {
 
   let text = '';
   let content = '';
+
+  const adapter = matchAdapter(finalUrl);
+  if (adapter) {
+    const sm = extractSiteMeta(adapter, document, { title, author });
+    if (sm.title) title = sm.title;
+    if (adapter.author.length) {
+      if (sm.author) author = sm.author;
+    } else {
+      author = '';
+    }
+    text = sm.text;
+    content = sm.content;
+    if (!author) {
+      const urlAuthor = extractAuthorFromUrl(finalUrl, adapter.name);
+      if (urlAuthor) author = urlAuthor;
+    }
+  }
+
   if (isWeixin(finalUrl)) {
     const wx = extractWeixin(document);
     if (wx.title) title = wx.title;
@@ -238,6 +418,15 @@ export async function extractFromUrl(url) {
       }
     } catch (e) {
       /* Readability 失败时回退 */
+    }
+  }
+  if (!text) {
+    const jsonld = tryExtractJsonLd(document);
+    if (jsonld) {
+      title = jsonld.title || title;
+      if (jsonld.author) author = jsonld.author;
+      text = jsonld.text;
+      content = html;
     }
   }
   if (!text) {
