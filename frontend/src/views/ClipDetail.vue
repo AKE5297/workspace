@@ -289,6 +289,83 @@ onMounted(() => {
 }
 .reader-html :deep(img) {
   max-width: 100%;
+  border-radius: 6px;
+}
+.reader-html :deep(h1),
+.reader-html :deep(h2),
+.reader-html :deep(h3),
+.reader-html :deep(h4) {
+  margin: 1.2em 0 0.6em;
+  line-height: 1.5;
+}
+.reader-html :deep(h1) {
+  font-size: 1.6em;
+}
+.reader-html :deep(h2) {
+  font-size: 1.35em;
+  border-bottom: 1px solid var(--el-border-color-light);
+  padding-bottom: 0.3em;
+}
+.reader-html :deep(h3) {
+  font-size: 1.15em;
+}
+.reader-html :deep(p) {
+  margin: 0.8em 0;
+}
+.reader-html :deep(pre) {
+  background: var(--el-fill-color-light);
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.reader-html :deep(code) {
+  background: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.reader-html :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.reader-html :deep(blockquote) {
+  border-left: 4px solid var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  margin: 0.8em 0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  color: var(--el-text-color-regular);
+}
+.reader-html :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.reader-html :deep(th),
+.reader-html :deep(td) {
+  border: 1px solid var(--el-border-color-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+.reader-html :deep(ul),
+.reader-html :deep(ol) {
+  padding-left: 1.6em;
+  margin: 0.8em 0;
+}
+.reader-html :deep(a) {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+.reader-html :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--el-border-color-light);
+  margin: 1.5em 0;
+}
+.reader-html :deep(section),
+.reader-html :deep(div) {
+  max-width: 100%;
 }
 .plain-text {
   word-break: break-word;

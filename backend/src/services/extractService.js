@@ -61,10 +61,6 @@ function absolutizeImages(html, baseUrl) {
   });
 }
 
-function isWeixin(url) {
-  return /mp\.weixin\.qq\.com/i.test(url);
-}
-
 // 站点专项提取：优先于通用选择器，针对已知平台使用其专属 DOM 结构
 const SITE_ADAPTERS = [
   {
@@ -292,29 +288,6 @@ function tryExtractJsonLd(document) {
   return null;
 }
 
-// 微信公众号文章正文在 #js_content 中，Readability 提取效果不稳定，做专项处理
-function extractWeixin(document) {
-  const titleEl = document.querySelector('#activity-name')
-    || document.querySelector('.rich_media_title')
-    || document.querySelector('h1');
-  const title = titleEl?.textContent?.trim() || '';
-
-  const authorEl = document.querySelector('#js_name')
-    || document.querySelector('.rich_media_meta_nickname')
-    || document.querySelector('meta[name="author"]');
-  const author = authorEl?.getAttribute('content') || authorEl?.textContent?.trim() || '';
-
-  const contentEl = document.querySelector('#js_content')
-    || document.querySelector('.rich_media_content');
-  let content = '';
-  let text = '';
-  if (contentEl) {
-    content = contentEl.innerHTML || '';
-    text = contentEl.textContent || '';
-  }
-  return { title, author, text, content };
-}
-
 export async function extractFromUrl(url) {
   if (!/^https?:\/\//i.test(url)) {
     throw new Error('仅支持 http/https 链接');
@@ -397,14 +370,6 @@ export async function extractFromUrl(url) {
       const urlAuthor = extractAuthorFromUrl(finalUrl, adapter.name);
       if (urlAuthor) author = urlAuthor;
     }
-  }
-
-  if (isWeixin(finalUrl)) {
-    const wx = extractWeixin(document);
-    if (wx.title) title = wx.title;
-    if (wx.author) author = wx.author;
-    text = wx.text;
-    content = wx.content;
   }
   if (!text) {
     try {

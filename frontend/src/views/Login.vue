@@ -47,9 +47,11 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { User, Lock, Message } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
+import { useSettingsStore } from '@/stores/settings';
 
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 const activeTab = ref('login');
 const loading = ref(false);
 
@@ -63,6 +65,7 @@ async function onLogin() {
   loading.value = true;
   try {
     await auth.login(loginForm.username, loginForm.password);
+    settings.fetchRemote();
     ElMessage.success('登录成功');
     router.push('/clips');
   } catch (e) {
@@ -82,6 +85,7 @@ async function onRegister() {
   loading.value = true;
   try {
     await auth.register(regForm.username, regForm.password, regForm.email);
+    settings.fetchRemote();
     ElMessage.success('注册成功');
     router.push('/clips');
   } catch (e) {
