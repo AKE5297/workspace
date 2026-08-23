@@ -23,7 +23,10 @@ export function findDuplicate(userId, url) {
 export async function createClip(userId, data) {
   const db = getDb();
   const id = `clip_${nextId('clip')}`;
-  const { images: localImages, replace } = await localizeImages(data.images, id);
+  const hasImages = Array.isArray(data.images) && data.images.length;
+  const imageSource = hasImages ? data.images : extractImagesFromContent(data.content);
+  const { images: localImages, replace } = await localizeImages(imageSource, id);
+  const newContent = rewriteContentImages(data.content, replace);
   const clip = {
     id,
     userId,
@@ -36,8 +39,8 @@ export async function createClip(userId, data) {
     isFavorite: Boolean(data.isFavorite),
     summary: data.summary || '',
     text: data.text || '',
-    content: rewriteContentImages(data.content, replace),
-    images: localImages,
+    content: newContent,
+    images: hasImages ? localImages : extractImagesFromContent(newContent),
     screenshot: data.screenshot || '',
     readingTime: data.readingTime || 0,
     favorite: Boolean(data.favorite),
@@ -56,13 +59,36 @@ export function getClipFull(id) {
   return readClipFile(id) || getDb().clips.find((c) => c.id === id) || null;
 }
 
+export function extractImagesFromContent(content) {
+  if (!content) return [];
+  const srcs = [];
+  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(content))) {
+    if (m[1] && !srcs.includes(m[1])) srcs.push(m[1]);
+  }
+  return srcs;
+}
+
 export async function updateClip(id, data) {
   const db = getDb();
   const idx = db.clips.findIndex((c) => c.id === id);
   if (idx < 0) return null;
   const existing = db.clips[idx];
   const full = readClipFile(id) || existing;
-  const { images: localImages, replace } = await localizeImages(data.images, id);
+  const hasImages = data.images !== undefined;
+  const imageSource = hasImages
+    ? data.images
+    : data.content !== undefined
+      ? extractImagesFromContent(data.content)
+      : undefined;
+  const { images: localImages, replace } = await localizeImages(imageSource, id);
+  const newContent = data.content !== undefined ? rewriteContentImages(data.content, replace) : existing.content;
+  const finalImages = hasImages
+    ? localImages
+    : data.content !== undefined
+      ? extractImagesFromContent(newContent)
+      : existing.images;
   const merged = {
     ...full,
     title: data.title !== undefined ? data.title : existing.title,
@@ -77,8 +103,8 @@ export async function updateClip(id, data) {
     favorite: data.favorite !== undefined ? data.favorite : existing.favorite,
     summary: data.summary !== undefined ? data.summary : existing.summary,
     text: data.text !== undefined ? data.text : existing.text,
-    content: data.content !== undefined ? rewriteContentImages(data.content, replace) : existing.content,
-    images: data.images !== undefined ? localImages : existing.images,
+    content: newContent,
+    images: finalImages,
     note: data.note !== undefined ? data.note : existing.note,
     updatedAt: now()
   };

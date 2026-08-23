@@ -6,7 +6,7 @@ import config from '../config.js';
 
 const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.avif', '.ico']);
 
-function isRemote(url) {
+export function isRemoteImage(url) {
   return /^https?:\/\//i.test(url || '');
 }
 
@@ -63,7 +63,7 @@ export async function localizeImages(images = [], clipId) {
   const localImages = [];
   const replace = {};
   for (const src of images) {
-    if (!isRemote(src)) {
+    if (!isRemoteImage(src)) {
       localImages.push(src);
       continue;
     }
