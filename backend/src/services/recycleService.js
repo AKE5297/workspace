@@ -1,6 +1,7 @@
 import { getDb, save, now, readClipFile, writeClipFile, deleteClipFile } from '../db.js';
 import config from '../config.js';
 import * as search from './searchService.js';
+import { cleanClipImagesDir } from './imageService.js';
 
 export function moveToRecycle(userId, ids) {
   const db = getDb();
@@ -74,6 +75,7 @@ export function purgeFromRecycle(userId, ids) {
     const entry = db.recycle[idx];
     if (entry.clip) {
       deleteClipFile(entry.clip.id);
+      cleanClipImagesDir(entry.clip.id);
       search.removeFromIndex(entry.clip.id);
     }
     db.recycle.splice(idx, 1);
@@ -89,6 +91,7 @@ export function purgeExpired() {
   expired.forEach((r) => {
     if (r.clip) {
       deleteClipFile(r.clip.id);
+      cleanClipImagesDir(r.clip.id);
       search.removeFromIndex(r.clip.id);
     }
   });

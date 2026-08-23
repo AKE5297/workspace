@@ -67,14 +67,14 @@ router.get('/:id', (req, res) => {
 router.post('/', async (req, res) => {
   const data = req.body || {};
   const dup = clipService.findDuplicate(req.user.id, data.url);
-  const clip = clipService.createClip(req.user.id, data);
+  const clip = await clipService.createClip(req.user.id, data);
   save();
 
   let summary = clip.summary || '';
   if (!summary && data.autoSummary) {
     try {
       summary = await generateSummary(clip);
-      if (summary) clipService.updateClip(clip.id, { summary });
+      if (summary) await clipService.updateClip(clip.id, { summary });
     } catch (e) {
       console.error('summary failed:', e.message);
     }
@@ -99,7 +99,7 @@ router.post('/:id/summary', async (req, res) => {
   try {
     const summary = await generateSummary(full);
     if (summary) {
-      clipService.updateClip(full.id, { summary });
+      await clipService.updateClip(full.id, { summary });
       save();
     }
     res.json({ summary });
@@ -108,19 +108,19 @@ router.post('/:id/summary', async (req, res) => {
   }
 });
 
-router.post('/:id/toggle-favorite', (req, res) => {
+router.post('/:id/toggle-favorite', async (req, res) => {
   const clip = getDb().clips.find((c) => c.id === req.params.id && c.userId === req.user.id);
   if (!clip) return res.status(404).json({ message: '剪藏不存在' });
   const next = !(clip.isFavorite || clip.favorite);
-  const updated = clipService.updateClip(req.params.id, { isFavorite: next, favorite: next });
+  const updated = await clipService.updateClip(req.params.id, { isFavorite: next, favorite: next });
   save();
   res.json({ isFavorite: next, clip: clipService.publicClip(updated) });
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const clip = getDb().clips.find((c) => c.id === req.params.id && c.userId === req.user.id);
   if (!clip) return res.status(404).json({ message: '剪藏不存在' });
-  const updated = clipService.updateClip(req.params.id, req.body || {});
+  const updated = await clipService.updateClip(req.params.id, req.body || {});
   save();
   res.json({ clip: clipService.publicClip(updated) });
 });

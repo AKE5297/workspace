@@ -64,6 +64,13 @@
             @change="(v) => toggleSelect(clip, v)"
             @click.stop
           />
+          <div v-if="clip.images && clip.images.length" class="clip-thumb" @click.stop @dblclick.stop>
+            <el-image :src="clip.images[0]" fit="cover" lazy class="clip-thumb-img">
+              <template #error>
+                <div class="thumb-fallback"><el-icon><Picture /></el-icon></div>
+              </template>
+            </el-image>
+          </div>
           <div class="clip-main">
             <div class="clip-title-row">
               <el-icon v-if="clip.isFavorite || clip.favorite" color="#e6a23c" class="fav-icon"><StarFilled /></el-icon>
@@ -466,6 +473,29 @@ onUnmounted(() => {
 }
 .clip-check {
   padding-top: 4px;
+}
+.clip-thumb {
+  width: 108px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+}
+.clip-thumb-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-placeholder);
+  font-size: 22px;
+  background: var(--el-fill-color-light);
 }
 .clip-main {
   flex: 1;

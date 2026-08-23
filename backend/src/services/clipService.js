@@ -1,6 +1,7 @@
 import { getDb, nextId, now, readClipFile, writeClipFile, deleteClipFile } from '../db.js';
 import { normalizeUrl, extractDomain, todayKey } from '../utils/helpers.js';
 import * as search from './searchService.js';
+import { localizeImages, rewriteContentImages, cleanClipImagesDir } from './imageService.js';
 
 function toPublic(clip) {
   if (!clip) return null;
@@ -19,9 +20,10 @@ export function findDuplicate(userId, url) {
   return { clip: toPublic(full), title: full.title, createdAt: full.createdAt };
 }
 
-export function createClip(userId, data) {
+export async function createClip(userId, data) {
   const db = getDb();
   const id = `clip_${nextId('clip')}`;
+  const { images: localImages, replace } = await localizeImages(data.images, id);
   const clip = {
     id,
     userId,
@@ -34,8 +36,8 @@ export function createClip(userId, data) {
     isFavorite: Boolean(data.isFavorite),
     summary: data.summary || '',
     text: data.text || '',
-    content: data.content || '',
-    images: Array.isArray(data.images) ? data.images : [],
+    content: rewriteContentImages(data.content, replace),
+    images: localImages,
     screenshot: data.screenshot || '',
     readingTime: data.readingTime || 0,
     favorite: Boolean(data.favorite),
@@ -54,12 +56,13 @@ export function getClipFull(id) {
   return readClipFile(id) || getDb().clips.find((c) => c.id === id) || null;
 }
 
-export function updateClip(id, data) {
+export async function updateClip(id, data) {
   const db = getDb();
   const idx = db.clips.findIndex((c) => c.id === id);
   if (idx < 0) return null;
   const existing = db.clips[idx];
   const full = readClipFile(id) || existing;
+  const { images: localImages, replace } = await localizeImages(data.images, id);
   const merged = {
     ...full,
     title: data.title !== undefined ? data.title : existing.title,
@@ -74,7 +77,8 @@ export function updateClip(id, data) {
     favorite: data.favorite !== undefined ? data.favorite : existing.favorite,
     summary: data.summary !== undefined ? data.summary : existing.summary,
     text: data.text !== undefined ? data.text : existing.text,
-    content: data.content !== undefined ? data.content : existing.content,
+    content: data.content !== undefined ? rewriteContentImages(data.content, replace) : existing.content,
+    images: data.images !== undefined ? localImages : existing.images,
     note: data.note !== undefined ? data.note : existing.note,
     updatedAt: now()
   };
@@ -89,6 +93,7 @@ export function hardDelete(id) {
   const idx = db.clips.findIndex((c) => c.id === id);
   if (idx >= 0) db.clips.splice(idx, 1);
   deleteClipFile(id);
+  cleanClipImagesDir(id);
   search.removeFromIndex(id);
 }
 
