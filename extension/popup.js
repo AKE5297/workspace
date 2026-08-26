@@ -6,8 +6,10 @@ const notebookSelect = document.getElementById('notebook');
 const saveBtn = document.getElementById('save');
 const statusEl = document.getElementById('status');
 
+const DEFAULT_SERVER = 'https://5173-9b655859f5bdf233.monkeycode-ai.online';
+
 chrome.storage.local.get(['server', 'token'], (data) => {
-  if (data.server) serverInput.value = data.server;
+  serverInput.value = data.server || DEFAULT_SERVER;
   if (data.token) tokenInput.value = data.token;
   loadNotebooks();
 });
@@ -59,6 +61,7 @@ async function capturePage() {
         '[class*="article_content"]',
         '[class*="post-content"]',
         '[class*="RichText"]',
+        '.Post-RichTextContainer',
         '.rich_media_content',
         '#js_content',
         '[class*="content"]'
@@ -71,10 +74,10 @@ async function capturePage() {
         articleText = articleEl.innerText || '';
         content = content.replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
           let na = attrs;
-          const dsrc = /\sdata-src=["']([^"']+)["']/i.exec(attrs);
+          const dsrc = /\sdata-(src|actualsrc|original)=["']([^"']+)["']/i.exec(attrs);
           const src = /\ssrc=["']([^"']*)["']/i.exec(attrs);
           if (dsrc && (!src || !src[1])) {
-            na = na.replace(dsrc[0], ` data-src="${dsrc[1]}" src="${dsrc[1]}"`);
+            na = na.replace(dsrc[0], ` data-src="${dsrc[2]}" src="${dsrc[2]}"`);
           }
           if (tag === 'img' && !/referrerpolicy=/i.test(na)) {
             na += ' referrerpolicy="no-referrer"';
@@ -84,17 +87,17 @@ async function capturePage() {
       }
 
       const images = [];
-      doc.querySelectorAll('img[src], img[data-src], img[data-original]').forEach((img) => {
-        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original');
-        if (src && /^https?:\/\//i.test(src) && !/logo|icon|avatar/i.test(src) && images.length < 20) {
+      doc.querySelectorAll('img[src], img[data-src], img[data-actualsrc], img[data-original]').forEach((img) => {
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-actualsrc') || img.getAttribute('data-original');
+        if (src && /^https?:\/\//i.test(src) && !/logo|icon|avatar|emoji|equation|data:image\/svg/i.test(src) && images.length < 20) {
           images.push(src);
         }
       });
 
       const imgSrcs = [...new Set(images)];
-      const articleUrl = articleEl ? [...articleEl.querySelectorAll('img')].map((i) => i.currentSrc || i.src).filter((s) => /^https?:\/\//i.test(s)) : [];
+      const articleUrl = articleEl ? [...articleEl.querySelectorAll('img')].map((i) => i.currentSrc || i.getAttribute('src') || i.getAttribute('data-actualsrc') || i.getAttribute('data-src')).filter((s) => s && /^https?:\/\//i.test(s)) : [];
 
-      return { text, title, url, content, articleText, images: imgSrcs };
+      return { text, title, url, content, articleText, images: imgSrcs.concat(articleUrl).filter((s, i, a) => a.indexOf(s) === i) };
     }
   });
   return results?.[0]?.result || null;

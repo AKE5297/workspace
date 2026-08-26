@@ -9,8 +9,15 @@
         <div v-if="wafHint" class="waf-hint">
           <el-alert type="info" :closable="false" show-icon>
             <template #title>
-              该站点有反爬验证，服务端无法直接抓取。建议安装浏览器扩展，在文章页面点击扩展图标即可一键剪藏（含完整正文和图片）。
+              该站点有反爬验证，服务端无法直接抓取。推荐使用浏览器扩展一键剪藏（含完整正文和图片）。
+              <el-link type="primary" @click="wafExpanded = !wafExpanded">{{ wafExpanded ? '收起' : '查看安装方法' }}</el-link>
             </template>
+            <ol v-if="wafExpanded" class="waf-steps">
+              <li>Chrome/Edge 打开 <code>chrome://extensions</code>，开启右上角「开发者模式」</li>
+              <li>点击「加载已解压的扩展程序」，选择项目 <code>extension</code> 目录</li>
+              <li>打开扩展设置，填入服务器地址 <code>{{ previewHost }}</code> 和 API Token（设置页获取）</li>
+              <li>在知乎等文章页点击扩展图标 → 保存剪藏</li>
+            </ol>
           </el-alert>
         </div>
         <div v-if="duplicateInfo" class="dup-warning">
@@ -133,12 +140,15 @@ const fetching = ref(false);
 const saving = ref(false);
 const duplicateInfo = ref(null);
 const wafHint = ref(false);
+const wafExpanded = ref(false);
 const cancelByDup = ref(false);
 const recommendedTags = ref([]);
 const aiTagLoading = ref(false);
 const aiSummaryLoading = ref(false);
 let draftTimer = null;
 const draftSaved = ref(false);
+
+const previewHost = computed(() => window.location.origin);
 
 const isEdit = computed(() => Boolean(props.clipId));
 
@@ -329,6 +339,19 @@ function formatDate(iso) {
 }
 .waf-hint {
   margin-top: 8px;
+}
+.waf-steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--el-text-color-regular);
+}
+.waf-steps code {
+  background: var(--el-fill-color-light);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
 }
 .dup-warning {
   margin-top: 8px;
