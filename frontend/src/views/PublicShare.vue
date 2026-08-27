@@ -9,6 +9,7 @@
         <div class="share-meta">
           <span v-if="clip.author">作者：{{ clip.author }}</span>
           <span>保存于 {{ formatDate(clip.createdAt) }}</span>
+          <span v-if="viewCount">访问 {{ viewCount }} 次</span>
         </div>
         <div v-if="clip.tags && clip.tags.length" class="share-tags">
           <el-tag v-for="t in clip.tags" :key="t" size="small" type="info">{{ t }}</el-tag>
@@ -38,6 +39,7 @@ const route = useRoute();
 const clip = ref(null);
 const loading = ref(true);
 const error = ref('');
+const viewCount = ref(0);
 
 const renderText = computed(() => (clip.value?.text || '').replace(/\n/g, '<br/>'));
 
@@ -46,6 +48,7 @@ async function load() {
   try {
     const { data } = await shareApi.getPublic(route.params.code);
     clip.value = data.clip;
+    viewCount.value = data.viewCount || 0;
   } catch (e) {
     error.value = e.response?.data?.message || '分享链接不存在或已失效';
   } finally {
@@ -110,6 +113,72 @@ onMounted(load);
 }
 .content-html :deep(img) {
   max-width: 100%;
+  border-radius: 6px;
+}
+.content-html :deep(h1),
+.content-html :deep(h2),
+.content-html :deep(h3),
+.content-html :deep(h4) {
+  margin: 1.2em 0 0.6em;
+  line-height: 1.5;
+}
+.content-html :deep(h2) {
+  border-bottom: 1px solid var(--el-border-color-light);
+  padding-bottom: 0.3em;
+}
+.content-html :deep(p) {
+  margin: 0.8em 0;
+}
+.content-html :deep(pre) {
+  background: var(--el-fill-color-light);
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.content-html :deep(code) {
+  background: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.content-html :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.content-html :deep(blockquote) {
+  border-left: 4px solid var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  margin: 0.8em 0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  color: var(--el-text-color-regular);
+}
+.content-html :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.content-html :deep(th),
+.content-html :deep(td) {
+  border: 1px solid var(--el-border-color-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+.content-html :deep(ul),
+.content-html :deep(ol) {
+  padding-left: 1.6em;
+  margin: 0.8em 0;
+}
+.content-html :deep(a) {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+.content-html :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--el-border-color-light);
+  margin: 1.5em 0;
 }
 .error-box {
   padding: 60px 0;

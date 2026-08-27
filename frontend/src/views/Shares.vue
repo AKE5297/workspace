@@ -19,6 +19,7 @@
               <span>创建于 {{ formatDate(s.createdAt) }}</span>
               <span v-if="s.expiresAt">有效期至 {{ formatDate(s.expiresAt) }}</span>
               <span v-else>永久有效</span>
+              <span v-if="s.viewCount">访问 {{ s.viewCount }} 次</span>
             </div>
             <div class="share-url text-ellipsis">{{ shareUrl(s.code) }}</div>
           </div>

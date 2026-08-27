@@ -14,8 +14,7 @@ router.get('/manage', (req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map((s) => {
       const clip = db.clips.find((c) => c.id === s.clipId);
-      return { ...s, clipTitle: clip ? clip.title : '已删除', active: isActive(s) };
-    });
+      return { ...s, clipTitle: clip ? clip.title : '已删除', active: isActive(s) };    });
   res.json({ items: shares });
 });
 
@@ -79,8 +78,10 @@ router.get('/public/:code', (req, res) => {
   }
   const full = readClipFile(share.clipId);
   if (!full) return res.status(404).json({ message: '剪藏内容不存在' });
+  share.viewCount = (share.viewCount || 0) + 1;
+  save();
   const { text, content, ...rest } = full;
-  res.json({ clip: { ...rest, content, text } });
+  res.json({ clip: { ...rest, content, text }, viewCount: share.viewCount });
 });
 
 export default router;
