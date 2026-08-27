@@ -42,10 +42,52 @@ async function capturePage() {
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
+      const AUTHOR_SELECTORS = [
+        [/(zhuanlan\.zhihu\.com|www\.zhihu\.com)/, ['.AuthorInfo-name', 'meta[name="author"]', '[class*="author-info"] .name']],
+        [/blog\.csdn\.net/, ['.name[username]', 'a.follow-nickName', '[class*="nick-name"]']],
+        [/cnblogs\.com/, ['#post-date a', '.postDesc a', '.day .postMeta a']],
+        [/jianshu\.com/, ['a.author', '.author .name']],
+        [/juejin\.cn/, ['.author-name']],
+        [/ithome\.com/, ['#author_baidu', '.aName', 'meta[name="author"]']],
+        [/sspai\.com/, ['.tag-owner-name', '.author']],
+        [/mp\.weixin\.qq\.com/, ['#js_name', '.rich_media_meta_nickname']],
+        [/^https?:\/\/[^/]+\//, ['meta[name="author"]', '[rel="author"]', '.author', '[class*="author"]', '.byline a', '.post-meta a']]
+      ];
+      const cleanTitle = (raw) =>
+        (raw || '')
+          .replace(/\s*[-_|]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|IT之家|少数派)$/i, '')
+          .trim();
+      const extractAuthor = () => {
+        const url = location.href;
+        let selectors = AUTHOR_SELECTORS[AUTHOR_SELECTORS.length - 1][1];
+        for (const [re, sels] of AUTHOR_SELECTORS) {
+          if (re.test(url)) {
+            selectors = sels;
+            break;
+          }
+        }
+        for (const s of selectors) {
+          let el = null;
+          try {
+            el = document.querySelector(s);
+          } catch (e) {
+            continue;
+          }
+          if (el) {
+            const name = el.textContent.trim();
+            if (name && name.length > 0 && name.length < 30) {
+              return name.replace(/^(作者[:：]\s*|posted\s+by\s+)/i, '').trim();
+            }
+          }
+        }
+        return '';
+      };
+
       const doc = document;
       const text = doc.body?.innerText || '';
-      const title = doc.title || '';
+      const title = cleanTitle(doc.title || '');
       const url = location.href;
+      const author = extractAuthor();
 
       const pick = (selectors) => {
         for (const s of selectors) {
@@ -97,7 +139,7 @@ async function capturePage() {
       const imgSrcs = [...new Set(images)];
       const articleUrl = articleEl ? [...articleEl.querySelectorAll('img')].map((i) => i.currentSrc || i.getAttribute('src') || i.getAttribute('data-actualsrc') || i.getAttribute('data-src')).filter((s) => s && /^https?:\/\//i.test(s)) : [];
 
-      return { text, title, url, content, articleText, images: imgSrcs.concat(articleUrl).filter((s, i, a) => a.indexOf(s) === i) };
+      return { text, title, url, author, content, articleText, images: imgSrcs.concat(articleUrl).filter((s, i, a) => a.indexOf(s) === i) };
     }
   });
   return results?.[0]?.result || null;
@@ -120,6 +162,7 @@ saveBtn.addEventListener('click', async () => {
     const payload = {
       title: titleInput.value.trim() || page?.title || '未命名剪藏',
       url: page?.url || '',
+      author: page?.author || '',
       text: textInput.value.trim() || page?.articleText || page?.text || '',
       content: page?.content || '',
       images: page?.images || [],
