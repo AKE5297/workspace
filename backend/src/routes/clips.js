@@ -14,7 +14,7 @@ function publicList(clips, includeText = false) {
   return clips.map((c) => {
     const full = includeText ? c : { ...c };
     if (!includeText) {
-      const { text, content, ...rest } = full;
+      const { text, content, markdown, ...rest } = full;
       return { ...rest, excerpt: (c.text || '').slice(0, 160) };
     }
     return full;

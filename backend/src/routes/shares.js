@@ -80,7 +80,7 @@ router.get('/public/:code', (req, res) => {
   if (!full) return res.status(404).json({ message: '剪藏内容不存在' });
   share.viewCount = (share.viewCount || 0) + 1;
   save();
-  const { text, content, ...rest } = full;
+  const { text, content, markdown, ...rest } = full;
   res.json({ clip: { ...rest, content, text }, viewCount: share.viewCount });
 });
 

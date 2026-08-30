@@ -2,10 +2,11 @@ import { getDb, nextId, now, readClipFile, writeClipFile, deleteClipFile } from 
 import { normalizeUrl, extractDomain, todayKey } from '../utils/helpers.js';
 import * as search from './searchService.js';
 import { localizeImages, rewriteContentImages, cleanClipImagesDir } from './imageService.js';
+import { htmlToMarkdown } from './markdownService.js';
 
 function toPublic(clip) {
   if (!clip) return null;
-  const { text, content, ...rest } = clip;
+  const { text, content, markdown, ...rest } = clip;
   return { ...rest };
 }
 
@@ -23,10 +24,12 @@ export function findDuplicate(userId, url) {
 export async function createClip(userId, data) {
   const db = getDb();
   const id = `clip_${nextId('clip')}`;
-  const hasImages = Array.isArray(data.images) && data.images.length;
-  const imageSource = hasImages ? data.images : extractImagesFromContent(data.content);
-  const { images: localImages, replace } = await localizeImages(imageSource, id);
+  const explicitImages = Array.isArray(data.images) ? data.images.filter((u) => /^https?:\/\//i.test(u)) : [];
+  const contentImages = extractImagesFromContent(data.content);
+  const imageSource = [...new Set([...explicitImages, ...contentImages])];
+  const { replace } = await localizeImages(imageSource, id);
   const newContent = rewriteContentImages(data.content, replace);
+  const markdown = data.markdown || htmlToMarkdown(newContent) || (data.text || '');
   const clip = {
     id,
     userId,
@@ -40,7 +43,8 @@ export async function createClip(userId, data) {
     summary: data.summary || '',
     text: data.text || '',
     content: newContent,
-    images: hasImages ? localImages : extractImagesFromContent(newContent),
+    markdown,
+    images: extractImagesFromContent(newContent),
     screenshot: data.screenshot || '',
     readingTime: data.readingTime || 0,
     favorite: Boolean(data.favorite),
@@ -57,6 +61,13 @@ export async function createClip(userId, data) {
 
 export function getClipFull(id) {
   return readClipFile(id) || getDb().clips.find((c) => c.id === id) || null;
+}
+
+export function getOwnedClip(id, userId) {
+  const db = getDb();
+  const clip = db.clips.find((c) => c.id === id && c.userId === userId);
+  if (!clip) return null;
+  return readClipFile(id) || clip;
 }
 
 export function extractImagesFromContent(content) {
@@ -77,18 +88,21 @@ export async function updateClip(id, data) {
   const existing = db.clips[idx];
   const full = readClipFile(id) || existing;
   const hasImages = data.images !== undefined;
-  const imageSource = hasImages
-    ? data.images
-    : data.content !== undefined
-      ? extractImagesFromContent(data.content)
-      : undefined;
-  const { images: localImages, replace } = await localizeImages(imageSource, id);
+  const contentImages = data.content !== undefined ? extractImagesFromContent(data.content) : [];
+  const explicitImages = hasImages ? data.images.filter((u) => /^https?:\/\//i.test(u)) : [];
+  const imageSource = data.content !== undefined || hasImages
+    ? [...new Set([...explicitImages, ...contentImages])]
+    : undefined;
+  const { replace } = await localizeImages(imageSource, id);
   const newContent = data.content !== undefined ? rewriteContentImages(data.content, replace) : existing.content;
-  const finalImages = hasImages
-    ? localImages
+  const newMarkdown = data.markdown !== undefined
+    ? data.markdown
     : data.content !== undefined
-      ? extractImagesFromContent(newContent)
-      : existing.images;
+      ? htmlToMarkdown(newContent) || (data.text !== undefined ? data.text : existing.text)
+      : undefined;
+  const finalImages = data.content !== undefined || hasImages
+    ? extractImagesFromContent(newContent)
+    : existing.images;
   const merged = {
     ...full,
     title: data.title !== undefined ? data.title : existing.title,
@@ -104,6 +118,7 @@ export async function updateClip(id, data) {
     summary: data.summary !== undefined ? data.summary : existing.summary,
     text: data.text !== undefined ? data.text : existing.text,
     content: newContent,
+    markdown: newMarkdown !== undefined ? newMarkdown : existing.markdown,
     images: finalImages,
     note: data.note !== undefined ? data.note : existing.note,
     updatedAt: now()

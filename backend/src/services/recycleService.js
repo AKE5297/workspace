@@ -40,7 +40,7 @@ export function listRecycle(userId) {
         ...r,
         remainDays,
         clip: (() => {
-          const { text, content, ...rest } = r.clip || {};
+          const { text, content, markdown, ...rest } = r.clip || {};
           return rest;
         })()
       };

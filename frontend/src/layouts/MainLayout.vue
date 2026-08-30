@@ -7,6 +7,8 @@
       </div>
       <el-menu :default-active="activeMenu" router class="menu">
         <el-menu-item index="/clips"><el-icon><Collection /></el-icon>剪藏列表</el-menu-item>
+        <el-menu-item index="/knowledge"><el-icon><Notebook /></el-icon>知识库</el-menu-item>
+        <el-menu-item index="/rag"><el-icon><ChatDotRound /></el-icon>智能问答</el-menu-item>
         <el-menu-item index="/notebooks"><el-icon><Folder /></el-icon>笔记本</el-menu-item>
         <el-menu-item index="/tags"><el-icon><PriceTag /></el-icon>标签</el-menu-item>
         <el-menu-item index="/favorites"><el-icon><Star /></el-icon>收藏</el-menu-item>
@@ -72,6 +74,8 @@ const tabs = [
 
 const activeMenu = computed(() => {
   const p = route.path;
+  if (p.startsWith('/knowledge')) return '/knowledge';
+  if (p.startsWith('/rag')) return '/rag';
   if (p.startsWith('/notebooks')) return '/notebooks';
   if (p.startsWith('/tags')) return '/tags';
   if (p.startsWith('/favorites')) return '/favorites';

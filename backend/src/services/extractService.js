@@ -126,6 +126,21 @@ const SITE_ADAPTERS = [
     author: ['#js_name', '.rich_media_meta_nickname'],
     content: ['#js_content', '.rich_media_content'],
     textPath: []
+  },
+  {
+    name: '飞书文档',
+    match: /(feishu\.cn|feishu\.com|feishu\.net|larksuite\.com)\/(docx|doc|wiki|docs)\//i,
+    title: ['[class*="docx-title"]', 'h1.title', '.doc-title', 'h1'],
+    author: ['meta[name="author"]', '[class*="author"]', '.docx-owner'],
+    content: [
+      '[class*="render-unit-container"]',
+      '[class*="document-container"]',
+      '.docx-content',
+      '.doc-content',
+      '#app',
+      'article'
+    ],
+    textPath: []
   }
 ];
 

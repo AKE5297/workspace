@@ -5,6 +5,22 @@
         <el-button text :icon="ArrowLeft" @click="$router.push('/clips')">返回列表</el-button>
         <div class="header-actions">
           <el-button size="small" @click="shareVisible = true" :icon="Share">分享</el-button>
+          <el-dropdown @command="handleExport">
+            <el-button size="small" :icon="Download">
+              导出
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="markdown">导出 Markdown</el-dropdown-item>
+                <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+                <el-dropdown-item v-if="markdownText" command="copy" divided>复制 Markdown</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button size="small" @click="toggleMarkdown" :type="markdownView ? 'primary' : 'default'" :icon="Markdown">
+            {{ markdownView ? '原文视图' : 'Markdown 视图' }}
+          </el-button>
           <el-button size="small" @click="toggleReadingMode" :type="readingMode ? 'primary' : 'default'" :icon="Reading">
             阅读模式
           </el-button>
@@ -43,8 +59,9 @@
           <p>{{ clip.summary }}</p>
         </div>
 
-        <el-divider v-if="clip.content" />
-        <div v-if="clip.content" class="reader-html" :class="{ 'reading-mode': readingMode }" v-html="clip.content"></div>
+        <el-divider v-if="clip.content || markdownText" />
+        <div v-if="markdownView && markdownText" class="markdown-view" v-html="renderedMarkdown"></div>
+        <div v-else-if="clip.content" class="reader-html" :class="{ 'reading-mode': readingMode }" v-html="clip.content"></div>
 
         <div v-else-if="clip.text" class="plain-text" v-html="renderText"></div>
       </div>
@@ -100,8 +117,10 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { ArrowLeft, Share, Reading, Star, Link, Document } from '@element-plus/icons-vue';
-import { clipApi, notebookApi, shareApi } from '@/api';
+import { ArrowLeft, Share, Reading, Star, Link, Document, Download, ArrowDown } from '@element-plus/icons-vue';
+import { marked } from 'marked';
+import { clipApi, notebookApi, shareApi, exportApi } from '@/api';
+import api from '@/api/client';
 import ClipEditor from '@/components/ClipEditor.vue';
 
 const route = useRoute();
@@ -110,6 +129,7 @@ const clip = ref(null);
 const notebooks = ref([]);
 const loading = ref(true);
 const readingMode = ref(false);
+const markdownView = ref(false);
 const editVisible = ref(false);
 const shareVisible = ref(false);
 const shareLoading = ref(false);
@@ -119,6 +139,16 @@ const expiresIn = ref(null);
 const renderText = computed(() => {
   if (!clip.value?.text) return '';
   return clip.value.text.replace(/\n/g, '<br/>');
+});
+
+const markdownText = computed(() => clip.value?.markdown || '');
+
+const renderedMarkdown = computed(() => {
+  try {
+    return marked.parse(markdownText.value, { gfm: true, breaks: true });
+  } catch (e) {
+    return `<pre>${markdownText.value}</pre>`;
+  }
 });
 
 async function load() {
@@ -197,6 +227,46 @@ async function copyLink() {
 
 function toggleReadingMode() {
   readingMode.value = !readingMode.value;
+}
+
+function toggleMarkdown() {
+  markdownView.value = !markdownView.value;
+}
+
+async function downloadBlob(res, fallbackName) {
+  const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' });
+  const disp = res.headers['content-disposition'] || '';
+  const match = /filename="?([^";]+)"?/.exec(decodeURIComponent(disp));
+  const name = match ? match[1] : fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function handleExport(command) {
+  if (command === 'copy') {
+    try {
+      await navigator.clipboard.writeText(markdownText.value);
+      ElMessage.success('Markdown 已复制');
+    } catch (e) {
+      ElMessage.warning('复制失败，请手动复制');
+    }
+    return;
+  }
+  try {
+    const id = clip.value.id;
+    const isPdf = command === 'pdf';
+    const res = await api.get(`/export/${id}/${isPdf ? 'pdf' : 'markdown'}`, { responseType: 'blob' });
+    await downloadBlob(res, `${clip.value.title || 'clip'}.${isPdf ? 'pdf' : 'md'}`);
+    ElMessage.success(`${isPdf ? 'PDF' : 'Markdown'} 导出成功`);
+  } catch (e) {
+    ElMessage.error(`导出失败：${e.response?.data?.message || e.message}`);
+  }
 }
 
 function formatDate(iso) {
@@ -370,6 +440,70 @@ onMounted(() => {
 .plain-text {
   word-break: break-word;
   white-space: normal;
+}
+.markdown-view {
+  line-height: 1.8;
+  word-break: break-word;
+}
+.markdown-view :deep(img) {
+  max-width: 100%;
+  border-radius: 6px;
+}
+.markdown-view :deep(h1),
+.markdown-view :deep(h2),
+.markdown-view :deep(h3),
+.markdown-view :deep(h4) {
+  margin: 1.2em 0 0.6em;
+  line-height: 1.5;
+}
+.markdown-view :deep(h2) {
+  border-bottom: 1px solid var(--el-border-color-light);
+  padding-bottom: 0.3em;
+}
+.markdown-view :deep(pre) {
+  background: var(--el-fill-color-light);
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.markdown-view :deep(code) {
+  background: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.markdown-view :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.markdown-view :deep(blockquote) {
+  border-left: 4px solid var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  margin: 0.8em 0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  color: var(--el-text-color-regular);
+}
+.markdown-view :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.markdown-view :deep(th),
+.markdown-view :deep(td) {
+  border: 1px solid var(--el-border-color-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-view :deep(a) {
+  color: var(--el-color-primary);
+}
+.markdown-view :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--el-border-color-light);
+  margin: 1.5em 0;
 }
 .share-input {
   margin-top: 12px;

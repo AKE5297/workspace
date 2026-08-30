@@ -80,3 +80,18 @@ export const uploadApi = {
 export const extractApi = {
   extract: (url) => api.post('/extract', { url })
 };
+
+export const exportApi = {
+  markdownUrl: (id) => `/api/export/${id}/markdown`,
+  pdfUrl: (id) => `/api/export/${id}/pdf`,
+  viewMarkdown: (id) => api.get(`/export/${id}/view-markdown`, { responseType: 'text' })
+};
+
+export const knowledgeApi = {
+  stats: () => api.get('/knowledge/stats')
+};
+
+export const ragApi = {
+  status: () => api.get('/rag/status'),
+  ask: (question) => api.post('/rag/ask', { question })
+};

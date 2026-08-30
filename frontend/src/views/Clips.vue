@@ -40,6 +40,7 @@
       <el-button size="small" type="primary" @click="openBatchEdit">批量编辑</el-button>
       <el-button size="small" @click="batchFavorite(true)">批量收藏</el-button>
       <el-button size="small" @click="batchFavorite(false)">取消收藏</el-button>
+      <el-button size="small" type="success" plain :loading="exporting" @click="batchExport">导出 Markdown</el-button>
       <el-button size="small" type="danger" @click="batchDelete">批量删除</el-button>
       <el-button size="small" text @click="selectedIds = []">取消选择</el-button>
     </div>
@@ -163,7 +164,8 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
-import { clipApi, notebookApi, tagApi, batchApi } from '@/api';
+import { clipApi, notebookApi, tagApi, batchApi, exportApi } from '@/api';
+import api from '@/api/client';
 import { useSettingsStore } from '@/stores/settings';
 import ClipEditor from '@/components/ClipEditor.vue';
 
@@ -191,6 +193,7 @@ const editingClip = ref(null);
 const batchVisible = ref(false);
 const batchLoading = ref(false);
 const batchForm = reactive({ title: '', author: '', notebookId: null, tags: [], tagMode: 'append' });
+const exporting = ref(false);
 
 const allSelected = computed(
   () => clips.value.length > 0 && selectedIds.value.length === clips.value.length
@@ -279,8 +282,29 @@ async function batchFavorite(v) {
   loadClips();
 }
 
-async function batchDelete() {
+async function batchExport() {
+  if (!selectedIds.value.length) return ElMessage.warning('请先选择要导出的剪藏');
+  exporting.value = true;
   try {
+    const res = await api.post('/export/batch-markdown', { ids: selectedIds.value }, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clips-export-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    ElMessage.success(`已导出 ${selectedIds.value.length} 篇为 Markdown`);
+  } catch (e) {
+    ElMessage.error(`导出失败：${e.response?.data?.message || e.message}`);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function batchDelete() {  try {
     await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 条剪藏？将移入回收站`, '批量删除', { type: 'warning' });
   } catch (e) {
     return;
