@@ -29,29 +29,33 @@
     </div>
 
     <div class="search-box">
-      <el-input
-        v-model="query"
-        placeholder="在全库中搜索标题、正文、标签、作者…"
-        clearable
-        :prefix-icon="Search"
-        @keyup.enter="doSearch"
-        @clear="clearSearch"
-      >
-        <template #append>
-          <el-button :icon="Search" @click="doSearch">搜索</el-button>
-        </template>
-      </el-input>
+      <div class="search-row">
+        <el-input
+          v-model="query"
+          placeholder="在全库中搜索标题、正文、标签、作者…"
+          clearable
+          :prefix-icon="Search"
+          @keyup.enter="doSearch"
+          @clear="clearSearch"
+        >
+          <template #append>
+            <el-button :icon="Search" @click="doSearch">搜索</el-button>
+          </template>
+        </el-input>
+        <el-select v-model="nbFilter" placeholder="全部笔记本" clearable style="width: 170px" @change="doSearchIfQuery">
+          <el-option v-for="nb in notebooks" :key="nb.id" :label="nb.name" :value="nb.id" />
+        </el-select>
+      </div>
+      <div v-if="searching" class="result-summary">
+        在「{{ scopeLabel }}」中检索到 {{ results.length }} 条匹配结果
+      </div>
     </div>
 
     <div v-if="searching" class="search-result" v-loading="searching">
       <template v-if="results.length">
-        <div class="result-summary">共 {{ results.length }} 条匹配结果</div>
         <div v-for="r in results" :key="r.id" class="result-item" @click="openClip(r)">
-          <div class="result-title">
-            <el-icon v-if="r.isFavorite || r.favorite" color="#e6a23c"><StarFilled /></el-icon>
-            {{ r.title }}
-          </div>
-          <div v-if="r.excerpt" class="result-excerpt">{{ r.excerpt }}</div>
+          <div class="result-title" v-html="highlight(r.title)"></div>
+          <div v-if="r.excerpt" class="result-excerpt" v-html="highlight(r.excerpt)"></div>
           <div class="result-meta">
             <span v-if="r.domain">{{ r.domain }}</span>
             <span v-if="r.author">{{ r.author }}</span>
@@ -81,7 +85,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Search, StarFilled } from '@element-plus/icons-vue';
@@ -94,6 +98,26 @@ const query = ref('');
 const results = ref([]);
 const searching = ref(false);
 const nbMap = ref({});
+const notebooks = ref([]);
+const nbFilter = ref(null);
+
+const scopeLabel = computed(() => {
+  if (!nbFilter.value) return '全部剪藏';
+  const nb = notebooks.value.find((n) => n.id === nbFilter.value);
+  return nb ? `笔记本：${nb.name}` : '全部剪藏';
+});
+
+function highlight(text) {
+  const q = query.value.trim();
+  if (!q || !text) return text;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try {
+    const re = new RegExp(`(${escaped})`, 'gi');
+    return String(text).replace(re, '<mark class="hl">$1</mark>');
+  } catch (e) {
+    return text;
+  }
+}
 
 const domainChart = ref(null);
 const tagChart = ref(null);
@@ -210,7 +234,9 @@ async function doSearch() {
   if (!q) return;
   searching.value = true;
   try {
-    const { data } = await clipApi.list({ q, pageSize: 50 });
+    const params = { q, pageSize: 50 };
+    if (nbFilter.value) params.notebookId = nbFilter.value;
+    const { data } = await clipApi.list(params);
     results.value = data.items.map((c) => ({
       ...c,
       notebookName: nbMap.value[c.notebookId] || ''
@@ -220,6 +246,10 @@ async function doSearch() {
   } finally {
     searching.value = false;
   }
+}
+
+function doSearchIfQuery() {
+  if (query.value.trim()) doSearch();
 }
 
 function clearSearch() {
@@ -236,6 +266,7 @@ onMounted(() => {
   notebookApi
     .list()
     .then(({ data }) => {
+      notebooks.value = data.items || [];
       nbMap.value = Object.fromEntries((data.items || []).map((nb) => [nb.id, nb.name]));
     })
     .catch(() => {});
@@ -288,7 +319,21 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 .search-box {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+}
+.search-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.search-row .el-input {
+  flex: 1;
+}
+.hl {
+  background: #ffe58f;
+  color: #ad6800;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 .search-result {
   background: var(--el-bg-color);

@@ -23,9 +23,26 @@ turndown.addRule('imageLocal', {
   }
 });
 
+function escapePipe(text) {
+  return String(text || '').replace(/\|/g, '\\|');
+}
+
 turndown.addRule('tableWrap', {
   filter: 'table',
-  replacement: (content, node) => `\n\n${content}\n\n`
+  replacement: (content, node) => {
+    const table = node;
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (!rows.length) return '\n\n';
+    const lines = [];
+    rows.forEach((tr, i) => {
+      const cells = Array.from(tr.children).map((td) => escapePipe(td.textContent.trim()));
+      lines.push(`| ${cells.join(' | ')} |`);
+      if (i === 0) {
+        lines.push(`| ${cells.map(() => '---').join(' | ')} |`);
+      }
+    });
+    return `\n\n${lines.join('\n')}\n\n`;
+  }
 });
 
 export function htmlToMarkdown(html) {

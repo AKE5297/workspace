@@ -128,6 +128,53 @@ const SITE_ADAPTERS = [
     textPath: []
   },
   {
+    name: '语雀',
+    match: /yuque\.com\/([^/]+\/[^/]+)\/?$/i,
+    title: ['.doc-title', 'h1', 'title'],
+    author: ['.doc-info .owner', 'meta[name="author"]'],
+    content: ['.ne-doc-content', '.doc-content', '.article-content', '#content', 'main'],
+    textPath: []
+  },
+  {
+    name: 'GitHub',
+    match: /github\.com\/.+\/(blob|issues|discussions|pull)\//i,
+    title: ['h1', '.gh-header-title', '.js-issue-title', '[class*="markdown-title"]'],
+    author: ['a.author', '.author', '[class*="author"]', 'meta[name="author"]'],
+    content: [
+      '.markdown-body',
+      '[data-testid="readme"]',
+      '.comment-body',
+      'article',
+      '#readme article',
+      'main'
+    ],
+    textPath: []
+  },
+  {
+    name: 'Medium',
+    match: /medium\.com\//i,
+    title: ['h1'],
+    author: ['a[rel="author"]', '.pw-author-name', '[data-testid="authorName"]'],
+    content: ['article section', 'article', '.postArticle-content'],
+    textPath: []
+  },
+  {
+    name: 'InfoQ',
+    match: /infoq\.cn\/(article|news)\//i,
+    title: ['h1.article-title', 'h1.title', 'h1'],
+    author: ['.article-info .author a', '.byline .author', '[rel="author"]', '.author-name'],
+    content: ['#articleContent', '.article-content', '.text', 'article'],
+    textPath: []
+  },
+  {
+    name: 'SegmentFault 思否',
+    match: /segmentfault\.com\/a\//i,
+    title: ['h1.article-title', 'h1'],
+    author: ['a.article__author', '.author-name', '.profile-name', 'meta[name="author"]'],
+    content: ['.article-content', '#articleContent', '.fmt', 'article'],
+    textPath: []
+  },
+  {
     name: '飞书文档',
     match: /(feishu\.cn|feishu\.com|feishu\.net|larksuite\.com)\/(docx|doc|wiki|docs)\//i,
     title: ['[class*="docx-title"]', 'h1.title', '.doc-title', 'h1'],

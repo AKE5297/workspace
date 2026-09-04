@@ -1,15 +1,32 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import config from '../config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fontPath = path.join(__dirname, '..', '..', 'assets', 'fonts', 'NotoSansSC-Regular.ttf');
 
+function resolveImagePath(src) {
+  if (!src) return null;
+  if (/^https?:\/\//i.test(src)) return src;
+  try {
+    const m = /^\/uploads\/(.+)$/.exec(src);
+    if (m) {
+      const fp = path.join(config.uploadsDir, m[1]);
+      return fs.existsSync(fp) ? fp : null;
+    }
+    return fs.existsSync(src) ? src : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 const FONT_SIZE = 11;
 const LINE_GAP = 4;
 const MARGIN = 50;
 const PAGE_WIDTH = 595.28;
+const PAGE_HEIGHT = 841.89;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 function splitParagraph(doc, text, size) {
@@ -19,6 +36,63 @@ function splitParagraph(doc, text, size) {
   for (const line of lines) {
     doc.text(line, { continued: false });
   }
+}
+
+function renderCodeBlock(doc, block) {
+  const lineHeight = 14;
+  const codeX = MARGIN + 8;
+  const width = CONTENT_WIDTH - 16;
+  const textWidth = width - 12;
+  const height = Math.max(block.lines.length, 1) * lineHeight + 12;
+  const y = doc.y;
+  doc.save();
+  doc.rect(codeX, y, width, height).fill('#f5f5f5');
+  doc.restore();
+  doc.fontSize(9).fillColor('#333333');
+  block.lines.forEach((line, i) => {
+    doc.text(line, codeX + 8, y + 6 + i * lineHeight, { width: textWidth, lineBreak: false });
+  });
+  doc.y = y + height;
+  doc.moveDown(0.4);
+}
+
+function renderTable(doc, block) {
+  const rows = block.rows;
+  if (!rows.length) return;
+  const colWidth = CONTENT_WIDTH / block.cols;
+  const cellPad = 6;
+  const lineHeight = 14;
+  const headerRows = block.hasHeader ? 1 : 0;
+
+  const colHeights = rows.map((row, ri) => {
+    let maxH = lineHeight;
+    row.forEach((cell, ci) => {
+      const w = colWidth - cellPad * 2;
+      const h = doc.heightOfString(cell, { width: w });
+      if (h > maxH) maxH = h;
+    });
+    return maxH + cellPad * 2;
+  });
+
+  let y = doc.y;
+  rows.forEach((row, ri) => {
+    const h = colHeights[ri];
+    let x = MARGIN;
+    row.forEach((cell, ci) => {
+      doc.save();
+      doc.rect(x, y, colWidth, h).stroke('#cccccc');
+      if (ri < headerRows) {
+        doc.rect(x, y, colWidth, h).fill('#eef2f7');
+      }
+      doc.restore();
+      doc.fillColor(ri < headerRows ? '#222222' : '#333333').fontSize(9);
+      doc.text(cell, x + cellPad, y + cellPad, { width: colWidth - cellPad * 2, lineBreak: false });
+      x += colWidth;
+    });
+    y += h;
+  });
+  doc.y = y;
+  doc.moveDown(0.4);
 }
 
 function renderBlock(doc, block) {
@@ -57,26 +131,28 @@ function renderBlock(doc, block) {
       break;
     }
     case 'code':
-      doc.fontSize(9).fillColor('#333333');
-      block.lines.forEach((line) => {
-        doc.text(line, MARGIN + 12, doc.y, { width: CONTENT_WIDTH - 24 });
-      });
-      doc.moveDown(0.4);
+      renderCodeBlock(doc, block);
+      break;
+    case 'table':
+      renderTable(doc, block);
       break;
     case 'hr':
       doc.moveDown(0.4);
       doc.moveTo(MARGIN, doc.y).lineTo(MARGIN + CONTENT_WIDTH, doc.y).strokeColor('#dddddd').stroke();
       doc.moveDown(0.4);
       break;
-    case 'image':
+    case 'image': {
       doc.moveDown(0.3);
+      const resolved = resolveImagePath(block.src);
       try {
-        doc.image(block.src, { fit: [CONTENT_WIDTH - 20, 300] });
+        if (!resolved) throw new Error('no image');
+        doc.image(resolved, { fit: [CONTENT_WIDTH - 20, 300] });
       } catch (e) {
         doc.fillColor('#999999').text('[图片]', { continued: false });
       }
       doc.moveDown(0.3);
       break;
+    }
     default:
       break;
   }
@@ -146,6 +222,31 @@ function parseMarkdown(md) {
       i++;
       continue;
     }
+    if (/^\s*\|/.test(line) && /^\s*\|.*\|\s*$/.test(line)) {
+      const table = { type: 'table', cols: 0, hasHeader: false, rows: [] };
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        const cells = lines[i]
+          .trim()
+          .replace(/^\|/, '')
+          .replace(/\|$/, '')
+          .split('|')
+          .map((c) => c.trim());
+        if (/^:?-{2,}:?$/.test(cells[0] || '')) {
+          table.hasHeader = table.rows.length > 0;
+          i++;
+          continue;
+        }
+        if (table.rows.length === 0) {
+          table.hasHeader = true;
+          table.cols = cells.length;
+        }
+        while (cells.length < table.cols) cells.push('');
+        table.rows.push(cells.slice(0, table.cols));
+        i++;
+      }
+      if (table.rows.length) blocks.push(table);
+      continue;
+    }
     if (/^\s*$/.test(line)) {
       if (blocks.length && blocks[blocks.length - 1].type === 'paragraph' && blocks[blocks.length - 1].text === '') {
         i++;
@@ -213,10 +314,24 @@ export function mdToPdfBuffer(markdown, options = {}) {
 
     const blocks = parseMarkdown(markdown);
     for (const block of blocks) {
-      if (doc.y > doc.page.height - 60) {
+      if (doc.y > PAGE_HEIGHT - 60) {
         doc.addPage();
       }
       renderBlock(doc, block);
+    }
+
+    const footer = options.footer || '';
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      const pageNum = i - range.start + 1;
+      doc.font('NotoSC');
+      doc.fontSize(8).fillColor('#999999');
+      if (footer) {
+        doc.text(footer, MARGIN, PAGE_HEIGHT - 32, { width: CONTENT_WIDTH, align: 'center' });
+      }
+      doc.text(String(pageNum), MARGIN, PAGE_HEIGHT - 32, { width: CONTENT_WIDTH, align: 'right' });
+      doc.moveTo(MARGIN, PAGE_HEIGHT - 42).lineTo(MARGIN + CONTENT_WIDTH, PAGE_HEIGHT - 42).strokeColor('#eeeeee').stroke();
     }
     doc.end();
   });

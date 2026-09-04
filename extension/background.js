@@ -45,7 +45,7 @@ async function saveSelection(info, tab) {
   } catch (e) {}
   const cleanTitle = (raw) =>
     (raw || '')
-      .replace(/\s*[-_|]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|IT之家|少数派)$/i, '')
+      .replace(/\s*[-_|]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否)$/i, '')
       .trim();
   const payload = {
     title: cleanTitle(pageTitle) || `选区摘录`,
@@ -86,6 +86,11 @@ async function savePage(tab) {
           [/ithome\.com/, ['#author_baidu', '.aName', 'meta[name="author"]']],
           [/sspai\.com/, ['.tag-owner-name', '.author']],
           [/mp\.weixin\.qq\.com/, ['#js_name', '.rich_media_meta_nickname']],
+          [/yuque\.com/, ['meta[name="author"]', '.doc-info .owner', '.owner']],
+          [/github\.com/, ['a.author', '.author', 'meta[name="author"]']],
+          [/medium\.com/, ['a[rel="author"]', '.pw-author-name', '[data-testid="authorName"]']],
+          [/infoq\.cn/, ['.article-info .author a', '.byline .author', '[rel="author"]']],
+          [/segmentfault\.com/, ['a.article__author', '.author-name', 'meta[name="author"]']],
           [/^https?:\/\/[^/]+\//, ['meta[name="author"]', '[rel="author"]', '.author', '[class*="author"]', '.byline a', '.post-meta a']]
         ];
         const cleanTitle = (raw) =>

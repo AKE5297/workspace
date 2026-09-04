@@ -34,9 +34,10 @@
       <div v-else class="messages">
         <div v-for="(msg, i) in messages" :key="i" class="msg" :class="msg.role">
           <div class="msg-bubble" :class="msg.role">
-            <div class="msg-content">{{ msg.content }}</div>
+            <div v-if="msg.role === 'assistant'" class="msg-content markdown-body" v-html="renderMd(msg.content)"></div>
+            <div v-else class="msg-content">{{ msg.content }}</div>
             <div v-if="msg.sources && msg.sources.length" class="msg-sources">
-              <div class="sources-title">参考来源：</div>
+              <div class="sources-title">参考来源（{{ msg.sources.length }}）：</div>
               <div
                 v-for="s in msg.sources"
                 :key="s.id"
@@ -56,6 +57,13 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="filter-row">
+      <el-select v-model="notebookId" placeholder="限定范围：全部剪藏" clearable style="width: 200px">
+        <el-option v-for="nb in notebooks" :key="nb.id" :label="nb.name" :value="nb.id" />
+      </el-select>
+      <span class="filter-hint">按笔记本限定问答检索范围</span>
     </div>
 
     <div class="input-bar">
@@ -80,19 +88,31 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { ChatDotRound, Document } from '@element-plus/icons-vue';
-import { ragApi } from '@/api';
+import { marked } from 'marked';
+import { ragApi, notebookApi } from '@/api';
+import api from '@/api/client';
 
 const router = useRouter();
 const messages = ref([]);
 const question = ref('');
 const loading = ref(false);
 const configured = ref(true);
+const notebooks = ref([]);
+const notebookId = ref(null);
 
 const suggestions = [
   '我的知识库里收藏了哪些技术主题？',
   '总结一下关于 RAG 的内容',
   '有哪些剪藏来自知乎？'
 ];
+
+const renderMd = (content) => {
+  try {
+    return marked.parse(content || '', { gfm: true, breaks: true });
+  } catch (e) {
+    return `<pre>${content || ''}</pre>`;
+  }
+};
 
 async function checkStatus() {
   try {
@@ -101,6 +121,20 @@ async function checkStatus() {
   } catch (e) {
     configured.value = false;
   }
+}
+
+async function loadNotebooks() {
+  try {
+    const { data } = await notebookApi.list();
+    notebooks.value = data.items;
+  } catch (e) { /* ignore */ }
+}
+
+function buildHistory() {
+  return messages.value
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-6)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
 }
 
 async function askQuestion(q) {
@@ -114,16 +148,52 @@ async function send() {
   messages.value.push({ role: 'user', content: q });
   question.value = '';
   loading.value = true;
+  const payload = {
+    question: q,
+    history: buildHistory(),
+    notebookId: notebookId.value
+  };
+
   try {
-    const { data } = await ragApi.ask(q);
-    if (data.needsKey) {
-      configured.value = false;
-      messages.value.push({ role: 'assistant', content: data.message || '未配置 API Key' });
-    } else if (!data.ok && data.message) {
-      messages.value.push({ role: 'assistant', content: data.message });
-    } else {
-      messages.value.push({ role: 'assistant', content: data.answer, sources: data.sources || [] });
+    const res = await api.post('/rag/ask-stream', payload, { responseType: 'text' });
+    const data = res.data;
+    let answer = '';
+    let sources = [];
+    let assistantMsg = null;
+    let failed = false;
+
+    for (const line of data.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const jsonText = line.slice(5).trim();
+      if (!jsonText) continue;
+      try {
+        const evt = JSON.parse(jsonText);
+        if (evt.type === 'needsKey') {
+          configured.value = false;
+          messages.value.push({ role: 'assistant', content: evt.message || '未配置 API Key' });
+          failed = true;
+        } else if (evt.type === 'sources') {
+          sources = evt.sources || [];
+        } else if (evt.type === 'token') {
+          answer += evt.content;
+          if (!assistantMsg) {
+            assistantMsg = { role: 'assistant', content: '' };
+            messages.value.push(assistantMsg);
+          }
+          assistantMsg.content = answer;
+          scrollToBottom();
+        } else if (evt.type === 'error') {
+          messages.value.push({ role: 'assistant', content: evt.message || '问答失败，请稍后重试' });
+          failed = true;
+        } else if (evt.type === 'done') {
+          if (assistantMsg) assistantMsg.sources = sources;
+          if (!assistantMsg && !failed) {
+            messages.value.push({ role: 'assistant', content: '', sources });
+          }
+        }
+      } catch (e) { /* 忽略解析失败分片 */ }
     }
+    if (assistantMsg && !assistantMsg.sources) assistantMsg.sources = sources;
   } catch (e) {
     messages.value.push({
       role: 'assistant',
@@ -148,6 +218,7 @@ function scrollToBottom() {
 
 onMounted(() => {
   checkStatus();
+  loadNotebooks();
 });
 </script>
 
@@ -240,6 +311,54 @@ onMounted(() => {
 .msg-content {
   font-size: 14px;
 }
+.msg-content :deep(p) {
+  margin: 0.5em 0;
+}
+.msg-content :deep(pre) {
+  background: var(--el-bg-color);
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.6;
+  font-size: 13px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+.msg-content :deep(code) {
+  background: var(--el-bg-color);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.msg-content :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.msg-content :deep(ul),
+.msg-content :deep(ol) {
+  padding-left: 1.5em;
+  margin: 0.4em 0;
+}
+.msg-content :deep(blockquote) {
+  border-left: 4px solid var(--el-color-primary);
+  margin: 0.6em 0;
+  padding-left: 12px;
+  color: var(--el-text-color-secondary);
+}
+.msg-content :deep(table) {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+}
+.msg-content :deep(th),
+.msg-content :deep(td) {
+  border: 1px solid var(--el-border-color-light);
+  padding: 6px 10px;
+}
+.msg-content :deep(h1),
+.msg-content :deep(h2),
+.msg-content :deep(h3) {
+  margin: 0.8em 0 0.4em;
+  font-size: 1.1em;
+}
 .msg-sources {
   margin-top: 10px;
   padding-top: 8px;
@@ -292,6 +411,16 @@ onMounted(() => {
 @keyframes blink {
   0%, 80%, 100% { opacity: 0.3; }
   40% { opacity: 1; }
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.filter-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .input-bar {
   display: flex;

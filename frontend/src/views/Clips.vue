@@ -40,7 +40,18 @@
       <el-button size="small" type="primary" @click="openBatchEdit">批量编辑</el-button>
       <el-button size="small" @click="batchFavorite(true)">批量收藏</el-button>
       <el-button size="small" @click="batchFavorite(false)">取消收藏</el-button>
-      <el-button size="small" type="success" plain :loading="exporting" @click="batchExport">导出 Markdown</el-button>
+      <el-dropdown @command="batchExport" style="margin: 0 4px">
+        <el-button size="small" type="success" plain :loading="exporting">
+          导出
+          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="md">合并 Markdown（单文件）</el-dropdown-item>
+            <el-dropdown-item command="zip">ZIP 分篇（含本地图片）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button size="small" type="danger" @click="batchDelete">批量删除</el-button>
       <el-button size="small" text @click="selectedIds = []">取消选择</el-button>
     </div>
@@ -163,7 +174,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search } from '@element-plus/icons-vue';
+import { Plus, Search, ArrowDown } from '@element-plus/icons-vue';
 import { clipApi, notebookApi, tagApi, batchApi, exportApi } from '@/api';
 import api from '@/api/client';
 import { useSettingsStore } from '@/stores/settings';
@@ -282,21 +293,24 @@ async function batchFavorite(v) {
   loadClips();
 }
 
-async function batchExport() {
+async function batchExport(format) {
   if (!selectedIds.value.length) return ElMessage.warning('请先选择要导出的剪藏');
   exporting.value = true;
   try {
-    const res = await api.post('/export/batch-markdown', { ids: selectedIds.value }, { responseType: 'blob' });
-    const blob = new Blob([res.data], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const url = format === 'zip' ? '/export/batch-zip' : '/export/batch-markdown';
+    const res = await api.post(url, { ids: selectedIds.value }, { responseType: 'blob' });
+    const ext = format === 'zip' ? 'zip' : 'md';
+    const type = format === 'zip' ? 'application/zip' : 'text/markdown;charset=utf-8';
+    const blob = new Blob([res.data], { type });
+    const url2 = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `clips-export-${Date.now()}.md`;
+    a.href = url2;
+    a.download = `clips-export-${Date.now()}.${ext}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    ElMessage.success(`已导出 ${selectedIds.value.length} 篇为 Markdown`);
+    setTimeout(() => URL.revokeObjectURL(url2), 2000);
+    ElMessage.success(`已导出 ${selectedIds.value.length} 篇剪藏`);
   } catch (e) {
     ElMessage.error(`导出失败：${e.response?.data?.message || e.message}`);
   } finally {
