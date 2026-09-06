@@ -1,3 +1,5 @@
+importScripts('snapshot.js');
+
 const DEFAULT_SERVER = 'https://5173-9b655859f5bdf233.monkeycode-ai.online';
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -16,6 +18,11 @@ function createMenus() {
       title: '保存整页到 Web Clipper',
       contexts: ['page']
     });
+    chrome.contextMenus.create({
+      id: 'clip-page-full',
+      title: '滚动加载全文后保存到 Web Clipper',
+      contexts: ['page']
+    });
   });
 }
 
@@ -28,9 +35,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'clip-selection') {
     saveSelection(info, tab);
   } else if (info.menuItemId === 'clip-page') {
-    savePage(tab);
+    savePage(tab, 'fast');
+  } else if (info.menuItemId === 'clip-page-full') {
+    savePage(tab, 'full');
   }
 });
+
+// 通用标题清理：去掉常见站点名后缀
+function cleanTitle(raw) {
+  return (raw || '')
+    .replace(
+      /\s*[-_|·\s]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|微信公众号文章|微信公众平台|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否|小红书|小红书笔记|什么值得买|SMZDM|博客|Blog)$/i,
+      ''
+    )
+    .trim();
+}
 
 async function saveSelection(info, tab) {
   const { server, token } = await getConfig();
@@ -43,10 +62,6 @@ async function saveSelection(info, tab) {
     });
     pageTitle = res?.[0]?.result || '';
   } catch (e) {}
-  const cleanTitle = (raw) =>
-    (raw || '')
-      .replace(/\s*[-_|]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否)$/i, '')
-      .trim();
   const payload = {
     title: cleanTitle(pageTitle) || `选区摘录`,
     url: info.pageUrl || tab?.url || '',
@@ -70,115 +85,27 @@ async function saveSelection(info, tab) {
   }
 }
 
-async function savePage(tab) {
+// 通过共享快照引擎抓取当前页（mode: 'fast' 直接抓 / 'full' 先滚动加载全文）
+async function snapshotTab(tabId, mode) {
+  const engine = self.__CLIPPER_SNAPSHOT__;
+  if (!engine) return null;
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: engine.CAPTURE_FN,
+    args: [engine.SITE_RULES, mode]
+  });
+  return results?.[0]?.result || null;
+}
+
+async function savePage(tab, mode = 'fast') {
   const { server, token } = await getConfig();
   if (!token) return notify('未配置 Token，请先打开扩展设置', true);
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        const AUTHOR_SELECTORS = [
-          [/(zhuanlan\.zhihu\.com|www\.zhihu\.com)/, ['.AuthorInfo-name', 'meta[name="author"]', '[class*="author-info"] .name']],
-          [/blog\.csdn\.net/, ['.name[username]', 'a.follow-nickName', '[class*="nick-name"]']],
-          [/cnblogs\.com/, ['#post-date a', '.postDesc a', '.day .postMeta a']],
-          [/jianshu\.com/, ['a.author', '.author .name']],
-          [/juejin\.cn/, ['.author-name']],
-          [/ithome\.com/, ['#author_baidu', '.aName', 'meta[name="author"]']],
-          [/sspai\.com/, ['.tag-owner-name', '.author']],
-          [/mp\.weixin\.qq\.com/, ['#js_name', '.rich_media_meta_nickname']],
-          [/yuque\.com/, ['meta[name="author"]', '.doc-info .owner', '.owner']],
-          [/github\.com/, ['a.author', '.author', 'meta[name="author"]']],
-          [/medium\.com/, ['a[rel="author"]', '.pw-author-name', '[data-testid="authorName"]']],
-          [/infoq\.cn/, ['.article-info .author a', '.byline .author', '[rel="author"]']],
-          [/segmentfault\.com/, ['a.article__author', '.author-name', 'meta[name="author"]']],
-          [/^https?:\/\/[^/]+\//, ['meta[name="author"]', '[rel="author"]', '.author', '[class*="author"]', '.byline a', '.post-meta a']]
-        ];
-        const cleanTitle = (raw) =>
-          (raw || '')
-            .replace(/\s*[-_|]\s*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|IT之家|少数派)$/i, '')
-            .trim();
-        const extractAuthor = () => {
-          const url = location.href;
-          let selectors = AUTHOR_SELECTORS[AUTHOR_SELECTORS.length - 1][1];
-          for (const [re, sels] of AUTHOR_SELECTORS) {
-            if (re.test(url)) {
-              selectors = sels;
-              break;
-            }
-          }
-          for (const s of selectors) {
-            let el = null;
-            try {
-              el = document.querySelector(s);
-            } catch (e) {
-              continue;
-            }
-            if (el) {
-              const name = el.textContent.trim();
-              if (name && name.length > 0 && name.length < 30) {
-                return name.replace(/^(作者[:：]\s*|posted\s+by\s+)/i, '').trim();
-              }
-            }
-          }
-          return '';
-        };
-
-        const doc = document;
-        const text = doc.body?.innerText || '';
-        const title = cleanTitle(doc.title || '');
-        const url = location.href;
-        const author = extractAuthor();
-        const pick = (selectors) => {
-          for (const s of selectors) {
-            const el = doc.querySelector(s);
-            if (el && el.textContent.trim().length > 100) return el;
-          }
-          return null;
-        };
-        const articleEl = pick([
-          'article',
-          '[class*="article-content"]',
-          '[class*="article_content"]',
-          '[class*="post-content"]',
-          '[class*="RichText"]',
-          '.Post-RichTextContainer',
-          '.rich_media_content',
-          '#js_content',
-          '[class*="content"]'
-        ]);
-        let content = '';
-        let articleText = '';
-        if (articleEl) {
-          content = articleEl.innerHTML || '';
-          articleText = articleEl.innerText || '';
-          content = content.replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
-            let na = attrs;
-            const dsrc = /\sdata-(src|actualsrc|original)=["']([^"']+)["']/i.exec(attrs);
-            const src = /\ssrc=["']([^"']*)["']/i.exec(attrs);
-            if (dsrc && (!src || !src[1])) {
-              na = na.replace(dsrc[0], ` data-src="${dsrc[2]}" src="${dsrc[2]}"`);
-            }
-            if (tag === 'img' && !/referrerpolicy=/i.test(na)) {
-              na += ' referrerpolicy="no-referrer"';
-            }
-            return `<${tag}${na}>`;
-          });
-        }
-        const images = [];
-        doc.querySelectorAll('img[src], img[data-src], img[data-actualsrc], img[data-original]').forEach((img) => {
-          const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-actualsrc') || img.getAttribute('data-original');
-          if (src && /^https?:\/\//i.test(src) && !/logo|icon|avatar|emoji|equation|data:image\/svg/i.test(src) && images.length < 20) {
-            images.push(src);
-          }
-        });
-        return { text, title, url, author, content, articleText, images: [...new Set(images)] };
-      }
-    });
-    const page = results?.[0]?.result;
+    const page = await snapshotTab(tab.id, mode);
     if (!page) return notify('无法读取页面内容', true);
     const payload = {
-      title: page.title || '未命名剪藏',
-      url: page.url || '',
+      title: cleanTitle(page.title) || '未命名剪藏',
+      url: page.url || tab?.url || '',
       author: page.author || '',
       text: page.articleText || page.text || '',
       content: page.content || '',
@@ -193,7 +120,7 @@ async function savePage(tab) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.message || '保存失败');
     }
-    notify('整页已保存到 Web Clipper');
+    notify(mode === 'full' ? '全文已加载并保存到 Web Clipper' : '整页已保存到 Web Clipper');
   } catch (e) {
     notify('保存失败：' + e.message, true);
   }

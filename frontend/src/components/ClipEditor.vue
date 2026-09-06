@@ -9,14 +9,15 @@
         <div v-if="wafHint" class="waf-hint">
           <el-alert type="info" :closable="false" show-icon>
             <template #title>
-              该站点有反爬验证，服务端无法直接抓取。推荐使用浏览器扩展一键剪藏（含完整正文和图片）。
-              <el-link type="primary" @click="wafExpanded = !wafExpanded">{{ wafExpanded ? '收起' : '查看安装方法' }}</el-link>
+              该站点有反爬验证/需要登录，服务端无法直接抓取。推荐使用浏览器扩展剪藏：
+              扩展会自动滚动页面加载全文，把完整正文与图片保存进来。
+              <el-link type="primary" @click="wafExpanded = !wafExpanded">{{ wafExpanded ? '收起' : '查看安装与使用方法' }}</el-link>
             </template>
             <ol v-if="wafExpanded" class="waf-steps">
               <li>Chrome/Edge 打开 <code>chrome://extensions</code>，开启右上角「开发者模式」</li>
               <li>点击「加载已解压的扩展程序」，选择项目 <code>extension</code> 目录</li>
               <li>打开扩展设置，填入服务器地址 <code>{{ previewHost }}</code> 和 API Token（设置页获取）</li>
-              <li>在知乎等文章页点击扩展图标 → 保存剪藏</li>
+              <li>在文章页点扩展图标 → 保存剪藏（默认自动滚动加载全文；长文也可右键页面 →「滚动加载全文后保存」）</li>
             </ol>
           </el-alert>
         </div>

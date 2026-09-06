@@ -175,6 +175,22 @@ const SITE_ADAPTERS = [
     textPath: []
   },
   {
+    name: '小红书',
+    match: /xiaohongshu\.com\/(explore|discovery\/item)\//i,
+    title: ['#detail-title', 'h1', '.title', '[class*="title"]'],
+    author: ['#user-name', '.author-wrapper .name', '.user-info .name', 'meta[name="author"]'],
+    content: ['#detail-desc', '.note-content', '[class*="note-content"]', '#detail-container .content'],
+    textPath: []
+  },
+  {
+    name: '什么值得买',
+    match: /smzdm\.com\/(p|article)\//i,
+    title: ['.article-title', '.article_title', 'h1'],
+    author: ['.article-author .name', '.article-author-name', '.author-name', '.name', 'meta[name="author"]'],
+    content: ['.article-detail-bd', '.txt-detail', '#articleId', '.m-article', '.article-content', '.detail-content'],
+    textPath: []
+  },
+  {
     name: '飞书文档',
     match: /(feishu\.cn|feishu\.com|feishu\.net|larksuite\.com)\/(docx|doc|wiki|docs)\//i,
     title: ['[class*="docx-title"]', 'h1.title', '.doc-title', 'h1'],
@@ -219,6 +235,17 @@ function cleanAuthor(raw) {
   let a = String(raw || '').trim();
   a = a.replace(/^作者[:：]\s*/i, '').replace(/^posted\s*@\s*/i, '').replace(/^编辑[:：]\s*/i, '');
   return a.trim();
+}
+
+// 清理标题尾部站点/栏目后缀（服务端 URL 抓取时与扩展保持一致）
+const SITE_TITLE_SUFFIXES =
+  /[-_|·\s]*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|微信公众号文章|微信公众平台|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否|小红书|小红书笔记|什么值得买|SMZDM|博客|Blog|稀土掘金|CSDN)$/i;
+
+function cleanTitleSuffix(raw) {
+  let t = String(raw || '').trim();
+  const prev = t.replace(SITE_TITLE_SUFFIXES, '').trim();
+  if (prev) t = prev;
+  return t.replace(/[-_|·\s]+$/i, '').trim();
 }
 
 function extractSiteMeta(adapter, document, fallback) {
@@ -483,7 +510,7 @@ export async function extractFromUrl(url) {
 
   return {
     url: finalUrl,
-    title: title.trim(),
+    title: cleanTitleSuffix(title) || document.title || '',
     author: author.trim(),
     text: text.trim(),
     content,

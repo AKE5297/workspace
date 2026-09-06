@@ -8,6 +8,8 @@
       input, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #dcdfe6; border-radius: 4px; margin-bottom: 8px; font-size: 13px; }
       textarea { min-height: 80px; resize: vertical; }
       select { width: 100%; padding: 6px; border: 1px solid #dcdfe6; border-radius: 4px; margin-bottom: 8px; }
+      .full-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #606266; margin-bottom: 8px; cursor: pointer; }
+      .full-row input { width: auto; margin: 0; }
       button { width: 100%; padding: 8px; border: none; border-radius: 4px; background: #409eff; color: #fff; font-size: 14px; cursor: pointer; }
       button:disabled { opacity: 0.5; }
       .status { margin-top: 8px; font-size: 12px; color: #67c23a; }
@@ -20,11 +22,16 @@
     <input id="token" placeholder="API Token" type="password" />
     <input id="title" placeholder="标题（默认使用页面标题）" />
     <textarea id="text" placeholder="剪藏内容（默认提取正文）"></textarea>
+    <label class="full-row" title="适用于小红书、微信公众号、长文博客等懒加载页面">
+      <input type="checkbox" id="full-mode" checked />
+      先自动滚动加载全文（懒加载页面必选）
+    </label>
     <select id="notebook">
       <option value="">未分类</option>
     </select>
     <button id="save">保存剪藏</button>
     <div id="status" class="status"></div>
+    <script src="snapshot.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

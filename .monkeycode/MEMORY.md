@@ -49,3 +49,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - extractService 有 SITE_ADAPTERS 站点专项表（CSDN/博客园/简书/掘金/IT之家/少数派/阮一峰/微信）+ JSON-LD 解析兜底，新增平台抓取适配应扩展该表
   - 简书等 SPA 站点正文纯 JS 渲染，服务端只能拿到摘要，完整正文需扩展剪藏
   - 后端 JSON 文件存储于 backend/data/，测试后需清理数据（测试账号/剪藏）
+
+[Project Knowledge Summary]
+- Date: 2026-08-18
+- Context: Discovered by Agent while adding snapshot engine to extension (第二轮剪藏增强)
+- Category: Workflow & Collaboration
+- Instructions:
+  - 站点剪藏规则需同时维护两处：后端 backend/src/services/extractService.js 的 SITE_ADAPTERS（URL 抓取）+ 扩展 extension/snapshot.js 的 SITE_RULES（DOM 抓取），两者结构与选择器应保持一致
+  - extension/snapshot.js 是 popup/background 共享的页面抓取引擎，CAPTURE_FN 会被 executeScript 序列化注入，函数体必须自包含（host/titleClean 用正则源字符串，不能传 RegExp 对象，args 序列化会破坏 RegExp）
+  - 扩展右键菜单现分三档：保存选区 / 保存整页（fast 直接抓）/ 滚动加载全文后保存（full 自动滚到底触发懒加载+展开全文）
+  - 小红书(explore|discovery/item)、什么值得买(smzdm.com/p) 后端 HTTP 抓不到，只能走扩展 full 模式 DOM 剪藏

@@ -33,7 +33,7 @@
 - 导出功能：单篇导出 Markdown / PDF（PDF 内置中文字体、自动分页、页眉页脚、表格与代码块排版）；列表批量导出合并 Markdown 或 ZIP 分篇（本地图片一并打包）
 - 知识库整合：跨全部剪藏的聚合统计（来源站点 / 标签 / 月度趋势）+ 全库检索（关键词高亮、可按笔记本限定）
 - 智能问答（RAG）：基于知识库的多轮对话问答（支持流式输出、按笔记本限定检索范围），回答附带参考来源与代码块排版；未配置 LLM Key 时前端友好提示
-- 站点专项适配：CSDN / 博客园 / 简书 / 掘金 / IT之家 / 少数派 / 阮一峰 / 微信公众号 / 语雀 / GitHub / Medium / InfoQ / SegmentFault / 飞书文档
+- 站点专项适配：CSDN / 博客园 / 简书 / 掘金 / IT之家 / 少数派 / 阮一峰 / 微信公众号 / 语雀 / GitHub / Medium / InfoQ / SegmentFault / 飞书文档 / 小红书 / 什么值得买 / 通用自建博客
 
 ### 第四阶段（进阶）
 - 全文 OCR 识别、网页完整存档、浏览器书签同步、协作笔记本、全文翻译（预留接口，按需开发）
@@ -88,7 +88,7 @@ docker compose up -d
 1. **Docker 容器化**：`deploy/Dockerfile` 打包前端静态文件与后端服务，Nginx 提供静态服务与反向代理，PM2 管理进程，`docker-compose.yml` 一键编排
 2. **传统服务器部署**：前端 `npm run build` 产出静态文件，由 Nginx/Apache 提供；后端 `npm start` 配合 PM2 或 systemd
 3. **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
-4. **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面
+4. **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
 5. **Cloudflare Workers / Tunnel**：可参考技术栈说明将 API 与前端迁移至 Cloudflare 边缘网络
 
 ## 项目结构
