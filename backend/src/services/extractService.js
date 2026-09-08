@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { JSDOM } from 'jsdom';
-import { Readability, isProbablyReaderable } from '@mozilla/readability';
+import { Readability } from '@mozilla/readability';
 import iconv from 'iconv-lite';
 
 const BROWSER_UA =
@@ -239,13 +239,13 @@ function cleanAuthor(raw) {
 
 // 清理标题尾部站点/栏目后缀（服务端 URL 抓取时与扩展保持一致）
 const SITE_TITLE_SUFFIXES =
-  /[-_|·\s]*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|微信公众号文章|微信公众平台|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否|小红书|小红书笔记|什么值得买|SMZDM|博客|Blog|稀土掘金|CSDN)$/i;
+  /[-_|·—–－\s]*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|微信公众号文章|微信公众平台|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否|小红书|小红书笔记|什么值得买|SMZDM|博客|Blog|稀土掘金|CSDN|overreacted)$/i;
 
 function cleanTitleSuffix(raw) {
   let t = String(raw || '').trim();
   const prev = t.replace(SITE_TITLE_SUFFIXES, '').trim();
   if (prev) t = prev;
-  return t.replace(/[-_|·\s]+$/i, '').trim();
+  return t.replace(/[-_|·—–－\s]+$/i, '').trim();
 }
 
 function extractSiteMeta(adapter, document, fallback) {
@@ -349,27 +349,68 @@ function tryExtractSpaJson(document) {
   return null;
 }
 
-// 解析 JSON-LD Article 结构（简书、语雀、多数现代站点均提供），提取 title/author/正文
+// 解析 JSON-LD Article/BlogPosting/NewsArticle 结构（自建博客 WordPress 等 SEO 插件多输出此类），
+// 支持 @graph / @type 数组递归定位，提取 title/author/正文
+const JSONLD_ARTICLE_TYPES = ['Article', 'BlogPosting', 'NewsArticle', 'TechArticle', 'Report', 'WebPage'];
+
+function isArticleType(t) {
+  if (typeof t === 'string') return JSONLD_ARTICLE_TYPES.includes(t);
+  if (Array.isArray(t)) return t.some((x) => JSONLD_ARTICLE_TYPES.includes(x));
+  return false;
+}
+
+function walkForArticle(node, found) {
+  if (!node || found) return found;
+  if (typeof node !== 'object') return found;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const r = walkForArticle(item, found);
+      if (r) return r;
+    }
+    return found;
+  }
+  if (isArticleType(node['@type'])) {
+    const text = extractArticleText(node);
+    if (text) return node;
+  }
+  // 深入 @graph / mainEntity / itemListElement 等常见容器
+  for (const key of ['@graph', 'mainEntity', 'itemListElement', 'hasPart']) {
+    if (node[key]) {
+      const r = walkForArticle(node[key], found);
+      if (r) return r;
+    }
+  }
+  return found;
+}
+
+function extractArticleText(article) {
+  return (
+    article.articleBody ||
+    (Array.isArray(article.articleSection) ? article.articleSection.join(' ') : article.articleSection) ||
+    (typeof article.text === 'string' && article.text.length > 100 ? article.text : '') ||
+    (article.description && article.description.length > 100 ? article.description : '')
+  );
+}
+
 function tryExtractJsonLd(document) {
   const scripts = document.querySelectorAll('script[type="application/ld+json"]');
   for (const s of scripts) {
     try {
       const data = JSON.parse(s.textContent);
-      const nodes = Array.isArray(data) ? data : [data];
-      for (const node of nodes) {
-        const article = node['@type'] === 'Article' || (Array.isArray(node['@type']) && node['@type'].includes('Article')) ? node : null;
-        if (!article) continue;
-        const text = article.articleBody
-          || (Array.isArray(article.articleSection) ? article.articleSection.join(' ') : article.articleSection)
-          || (article.description && article.description.length > 100 ? article.description : '');
-        const title = article.headline || article.name || '';
-        const author = article.author
-          ? (typeof article.author === 'string' ? article.author : article.author.name || '')
-          : '';
-        if (text && text.length > 100) {
-          return { title, author, text };
-        }
-      }
+      const article = walkForArticle(data, null);
+      if (!article) continue;
+      const text = extractArticleText(article);
+      if (!text) continue;
+      const title = article.headline || article.name || '';
+      const author = article.author
+        ? (typeof article.author === 'string'
+            ? article.author
+            : Array.isArray(article.author)
+              ? (article.author[0]?.name || '')
+              : article.author.name || '')
+        : '';
+      const date = article.datePublished || article.dateModified || '';
+      return { title, author, text, date };
     } catch (e) {
       /* 非 JSON 则跳过 */
     }
@@ -460,25 +501,35 @@ export async function extractFromUrl(url) {
       if (urlAuthor) author = urlAuthor;
     }
   }
+
+  // 结构化正文提取（自建博客/常规站无 adapter 时）：直接尝试 Readability，
+  // 不再依赖 isProbablyReaderable 的前置判定（该判定对部分博客主题过严）
+  const jsonld = tryExtractJsonLd(document);
+  if (jsonld) {
+    if (!title) title = jsonld.title;
+    if (!author && jsonld.author) author = jsonld.author;
+  }
   if (!text) {
+    let readabilityContent = '';
+    let readabilityText = '';
     try {
-      if (isProbablyReaderable(document)) {
-        const article = new Readability(document).parse();
-        if (article && article.textContent) {
-          title = article.title || title;
-          text = article.textContent || '';
-          content = article.content || '';
-        }
+      const article = new Readability(document).parse();
+      if (article) {
+        readabilityText = (article.textContent || '').trim();
+        readabilityContent = (article.content || '').trim();
       }
     } catch (e) {
       /* Readability 失败时回退 */
     }
-  }
-  if (!text) {
-    const jsonld = tryExtractJsonLd(document);
-    if (jsonld) {
+    // 正文过短视为误提取，丢弃结构交由后续兜底
+    const ok = readabilityText.length >= 120;
+    if (ok) {
+      title = (jsonld && jsonld.title) || title;
+      text = readabilityText;
+      content = readabilityContent;
+    } else if (jsonld && jsonld.text) {
+      // 无干净 DOM 结构但有 JSON-LD 正文：text 用结构化正文，content 用整页供前端编辑
       title = jsonld.title || title;
-      if (jsonld.author) author = jsonld.author;
       text = jsonld.text;
       content = html;
     }
