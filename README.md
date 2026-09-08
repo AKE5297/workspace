@@ -34,7 +34,7 @@
 - 知识库整合：跨全部剪藏的聚合统计（来源站点 / 标签 / 月度趋势）+ 全库检索（关键词高亮、可按笔记本限定）
 - 智能问答（RAG）：基于知识库的多轮对话问答（支持流式输出、按笔记本限定检索范围），回答附带参考来源与代码块排版；未配置 LLM Key 时前端友好提示
 - 站点专项适配：CSDN / 博客园 / 简书 / 掘金 / IT之家 / 少数派 / 阮一峰 / 微信公众号 / 语雀 / GitHub / Medium / InfoQ / SegmentFault / 飞书文档 / 小红书 / 什么值得买 / 通用自建博客（WordPress / Hugo / Hexo / Typecho 等）
-- 服务端智能抓取：URL 粘贴即收藏；识别 JSON-LD（Article / BlogPosting / NewsArticle 等）自动提取标题 / 作者 / 结构化正文，配合 Readability 解析任意常规博客文章，自动清理标题站点后缀
+- 服务端智能抓取：URL 粘贴即收藏；识别 JSON-LD（Article / BlogPosting / NewsArticle 等）自动提取标题 / 作者 / 结构化正文，配合 Readability 解析任意常规博客文章，自动清理标题站点后缀与封面占位图
 
 ### 第四阶段（进阶）
 - 全文 OCR 识别、网页完整存档、浏览器书签同步、协作笔记本、全文翻译（预留接口，按需开发）

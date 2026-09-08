@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Web Clipper",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "一键保存当前页面到 Web Clipper 剪藏工具（支持懒加载页面滚动加载全文）",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "contextMenus", "notifications"],
   "host_permissions": [

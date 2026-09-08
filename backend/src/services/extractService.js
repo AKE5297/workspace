@@ -241,10 +241,48 @@ function cleanAuthor(raw) {
 const SITE_TITLE_SUFFIXES =
   /[-_|·—–－\s]*(知乎专栏|知乎|简书|掘金|CSDN博客|博客园|微信公众号|微信公众号文章|微信公众平台|IT之家|少数派|语雀|GitHub|Medium|InfoQ|SegmentFault思否|思否|小红书|小红书笔记|什么值得买|SMZDM|博客|Blog|稀土掘金|CSDN|overreacted)$/i;
 
-function cleanTitleSuffix(raw) {
+// 动态探测站点品牌名（og:site_name / application-name / header 品牌容器短文本）
+function detectSiteName(document) {
+  if (!document) return '';
+  try {
+    for (const sel of ['meta[property="og:site_name"]', 'meta[name="application-name"]']) {
+      const el = document.querySelector(sel);
+      const v = el?.getAttribute('content');
+      if (v && v.trim().length >= 2 && v.trim().length <= 30) return v.trim();
+    }
+    const brandSels = [
+      '[class*="site-name"]',
+      '[class*="siteName"]',
+      '[class*="blog-title"]',
+      '[class*="blogTitle"]',
+      '[class*="brand"]',
+      '.navbar-brand',
+      'header .logo',
+      '.logo a',
+      '.site-title a'
+    ];
+    for (const sel of brandSels) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (t && t.length >= 2 && t.length <= 30 && !/home|首页|主页|返回/i.test(t)) return t;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return '';
+}
+
+function cleanTitleSuffix(raw, document) {
   let t = String(raw || '').trim();
   const prev = t.replace(SITE_TITLE_SUFFIXES, '').trim();
   if (prev) t = prev;
+  const siteName = document ? detectSiteName(document) : '';
+  if (siteName) {
+    const re = siteName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp('\\s*[-_|·—–:：]\\s*' + re + '\\s*$', 'i'), '');
+    t = t.replace(new RegExp('^\\s*' + re + '\\s*[-_|·—–:：]\\s*', 'i'), '');
+  }
   return t.replace(/[-_|·—–－\s]+$/i, '').trim();
 }
 
@@ -552,7 +590,11 @@ export async function extractFromUrl(url) {
   if (images.length < 3) {
     const imgs = [...document.querySelectorAll('img[src], img[data-src]')]
       .map((img) => img.getAttribute('src') || img.getAttribute('data-src'))
-      .filter((s) => /^https?:\/\//i.test(s) && !/logo|icon|avatar/i.test(s))
+      .filter(
+        (s) =>
+          /^https?:\/\//i.test(s) &&
+          !/logo|icon|avatar|emoji|equation|spacer|blank|pixel|transparent|loading|data:image/i.test(s)
+      )
       .slice(0, 3 - images.length);
     images.push(...imgs);
   }
@@ -561,7 +603,7 @@ export async function extractFromUrl(url) {
 
   return {
     url: finalUrl,
-    title: cleanTitleSuffix(title) || document.title || '',
+    title: cleanTitleSuffix(title, document) || document.title || '',
     author: author.trim(),
     text: text.trim(),
     content,

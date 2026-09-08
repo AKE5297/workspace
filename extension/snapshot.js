@@ -220,6 +220,40 @@
       }
       return rules[rules.length - 1];
     };
+    // 探测站点品牌名：优先 meta，其次 header/品牌容器短文本
+    const detectSiteName = () => {
+      try {
+        for (const sel of ['meta[property="og:site_name"]', 'meta[name="application-name"]']) {
+          const el = document.querySelector(sel);
+          const v = el && el.getAttribute('content');
+          if (v && v.trim().length >= 2 && v.trim().length <= 30) return v.trim();
+        }
+        const brandSels = [
+          '[class*="site-name"]',
+          '[class*="siteName"]',
+          '[class*="blog-title"]',
+          '[class*="blogTitle"]',
+          '[class*="brand"]',
+          '.navbar-brand',
+          'header .logo',
+          '.logo a',
+          '.site-title a'
+        ];
+        for (const sel of brandSels) {
+          let el = null;
+          try {
+            el = document.querySelector(sel);
+          } catch (e) {
+            continue;
+          }
+          if (!el) continue;
+          const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (t && t.length >= 2 && t.length <= 30 && !/home|首页|主页|返回/i.test(t)) return t;
+        }
+      } catch (e) {}
+      return '';
+    };
+    const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const cleanTitleOf = (rule, raw) => {
       let t = String(raw || '').trim();
       if (rule.titleClean) {
@@ -227,7 +261,17 @@
           t = t.replace(new RegExp(rule.titleClean, 'i'), '');
         } catch (e) {}
       }
-      t = t.replace(/\s*[-_|·]\s*$/i, '').trim();
+      const siteName = detectSiteName();
+      if (siteName) {
+        const re = escapeRe(siteName);
+        try {
+          // 尾部："文章标题 - 站点名" / "文章标题 — 站点名"
+          t = t.replace(new RegExp('\\s*[-_|·—–:：]\\s*' + re + '\\s*$', 'i'), '');
+          // 头部："站点名 - 文章标题"
+          t = t.replace(new RegExp('^\\s*' + re + '\\s*[-_|·—–:：]\\s*', 'i'), '');
+        } catch (e) {}
+      }
+      t = t.replace(/\s*[-_|·—–]\s*$/i, '').trim();
       return t;
     };
 
@@ -393,6 +437,16 @@
       }
     }
 
+    const isPlaceholderImg = (img) => {
+      const aW = parseInt(img.getAttribute('width') || '', 10);
+      const aH = parseInt(img.getAttribute('height') || '', 10);
+      if ((aW > 0 || aH > 0) && aW < 60 && aH < 60) return true; // 显式小尺寸占位图
+      if (img.naturalWidth > 0 && img.naturalWidth < 60 && img.naturalHeight < 60) return true; // 已解码小图
+      const src = realSrcOf(img) || '';
+      return /spacer|blank|pixel|1x1|transparent|dot_pixel|\.loading\.|loader\.|placeholder/i.test(src) ||
+        /\/?(spacer|blank|pixel|px|dot|transparent)(\.|\/|$)/i.test(src);
+    };
+
     const images = [];
     doc.querySelectorAll('img[src], img[data-src], img[data-original], img[data-actualsrc], img[data-echo]').forEach((img) => {
       const src = realSrcOf(img);
@@ -400,6 +454,7 @@
         src &&
         /^https?:/i.test(src) &&
         !/logo|icon|avatar|emoji|equation|placeholder|loading|data:image\/svg/i.test(src) &&
+        !isPlaceholderImg(img) &&
         images.length < 25
       ) {
         images.push(src);
