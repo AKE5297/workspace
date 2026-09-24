@@ -1,0 +1,2 @@
+# SPA 回退：所有前端路由交由 index.html 处理（Cloudflare Pages / Netlify 通用）
+/*    /index.html   200

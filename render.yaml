@@ -1,0 +1,33 @@
+# Render Blueprint 部署配置
+# 用法：Render Dashboard -> New + -> Blueprint -> 连接本仓库，按提示确认即可。
+# 单服务模式：构建前端静态产物，由后端通过 SERVE_DIST 一并托管（仅暴露一个端口）。
+services:
+  - type: web
+    name: web-clipper
+    runtime: node
+    plan: starter
+    buildCommand: npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend ci
+    startCommand: node backend/src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_DIST
+        value: "true"
+      # 数据持久化目录（需配合下方 disk 使用；免费实例不含持久磁盘）
+      - key: DATA_DIR
+        value: /var/data
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: USER_LLM_API_KEY
+        sync: false
+      - key: USER_LLM_BASE_URL
+        sync: false
+      - key: USER_LLM_MODEL
+        sync: false
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

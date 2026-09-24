@@ -1,0 +1,27 @@
+# 后端 systemd 服务示例（前端可用 SERVE_DIST 一并托管，见 Environment 行）
+#
+# 用法（需 root 权限）：
+#   cp deploy/web-clipper.service /etc/systemd/system/web-clipper.service
+#   按实际路径修改 WorkingDirectory / User / EnvironmentFile
+#   systemctl daemon-reload
+#   systemctl enable --now web-clipper
+#   systemctl status web-clipper
+
+[Unit]
+Description=Web Clipper API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/web-clipper/backend
+EnvironmentFile=/opt/web-clipper/backend/.env
+Environment=NODE_ENV=production
+# 需要后端同时托管前端静态产物时保留下一行，并确保已执行 frontend 构建
+Environment=SERVE_DIST=true
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

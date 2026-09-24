@@ -17,17 +17,37 @@ function feedItem(clip, base) {
   };
 }
 
-function buildXml(feedTitle, items, base) {
+// CDATA 段内的 "]]>" 必须拆分，否则会提前闭合 CDATA 破坏 XML
+export function cdata(value) {
+  return `<![CDATA[${String(value == null ? '' : value).replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}
+
+export function escapeXml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// 非法日期回退为当前时间，避免输出 "Invalid Date"
+export function safeDate(value) {
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+export function buildXml(feedTitle, items, base) {
   const rssItems = items
     .map((it) => {
-      const tags = (it.tags || []).map((t) => `<category><![CDATA[${t}]]></category>`).join('');
+      const tags = (it.tags || []).map((t) => `<category>${cdata(t)}</category>`).join('');
       return `<item>
-  <title><![CDATA[${it.title}]]></title>
-  <link><![CDATA[${it.link}]]></link>
-  <description><![CDATA[${it.description}]]></description>
-  ${it.author ? `<author><![CDATA[${it.author}]]></author>` : ''}
-  <pubDate>${new Date(it.pubDate).toUTCString()}</pubDate>
-  <guid isPermaLink="false">${it.guid || ''}</guid>
+  <title>${cdata(it.title)}</title>
+  <link>${cdata(it.link)}</link>
+  <description>${cdata(it.description)}</description>
+  ${it.author ? `<author>${cdata(it.author)}</author>` : ''}
+  <pubDate>${safeDate(it.pubDate).toUTCString()}</pubDate>
+  <guid isPermaLink="false">${escapeXml(it.guid)}</guid>
   ${tags}
 </item>`;
     })
@@ -35,31 +55,31 @@ function buildXml(feedTitle, items, base) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
-  <title><![CDATA[${feedTitle}]]></title>
-  <link><![CDATA[${base}]]></link>
-  <description><![CDATA[${feedTitle} 的 RSS 订阅]]></description>
-  <atom:link href="${base}" rel="self" type="application/rss+xml"/>
+  <title>${cdata(feedTitle)}</title>
+  <link>${cdata(base)}</link>
+  <description>${cdata(`${feedTitle} 的 RSS 订阅`)}</description>
+  <atom:link href="${escapeXml(base)}" rel="self" type="application/rss+xml"/>
   ${rssItems}
 </channel>
 </rss>`;
 }
 
-function buildAtom(feedTitle, items, base) {
+export function buildAtom(feedTitle, items, base) {
   const entries = items
     .map((it) => `<entry>
-  <title><![CDATA[${it.title}]]></title>
-  <link href="${it.link}"/>
-  <id>${it.guid || ''}</id>
-  <updated>${new Date(it.pubDate).toISOString()}</updated>
-  <summary type="html"><![CDATA[${it.description}]]></summary>
-  ${it.author ? `<author><name>${it.author}</name></author>` : ''}
+  <title>${cdata(it.title)}</title>
+  <link href="${escapeXml(it.link)}"/>
+  <id>${escapeXml(it.guid)}</id>
+  <updated>${safeDate(it.pubDate).toISOString()}</updated>
+  <summary type="html">${cdata(it.description)}</summary>
+  ${it.author ? `<author><name>${escapeXml(it.author)}</name></author>` : ''}
 </entry>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title><![CDATA[${feedTitle}]]></title>
-  <link href="${base}"/>
-  <id>${base}</id>
+  <title>${cdata(feedTitle)}</title>
+  <link href="${escapeXml(base)}"/>
+  <id>${escapeXml(base)}</id>
   <updated>${new Date().toISOString()}</updated>
   ${entries}
 </feed>`;

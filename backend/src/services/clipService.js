@@ -27,7 +27,7 @@ export async function createClip(userId, data) {
   const explicitImages = Array.isArray(data.images) ? data.images.filter((u) => /^https?:\/\//i.test(u)) : [];
   const contentImages = extractImagesFromContent(data.content);
   const imageSource = [...new Set([...explicitImages, ...contentImages])];
-  const { replace } = await localizeImages(imageSource, id);
+  const { replace } = await localizeImages(imageSource, id, data.url);
   const newContent = rewriteContentImages(data.content, replace);
   const markdown = data.markdown || htmlToMarkdown(newContent) || (data.text || '');
   const clip = {
@@ -73,11 +73,41 @@ export function getOwnedClip(id, userId) {
 export function extractImagesFromContent(content) {
   if (!content) return [];
   const srcs = [];
-  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  const push = (u) => {
+    const url = String(u || '').trim();
+    // 跳过内联二进制与页面内 blob，其余（http(s) 与已本地化的相对路径）均保留
+    if (!url || /^(data|blob):/i.test(url)) return;
+    if (!srcs.includes(url)) srcs.push(url);
+  };
+  const attrOf = (tag, name) => {
+    const re = new RegExp('\\s' + name + '\\s*=\\s*["\']([^"\']*)["\']', 'i');
+    const mm = re.exec(tag);
+    return mm ? mm[1] : '';
+  };
+  // srcset 候选按尺寸升序约定，取最后一项（通常最大）的 URL
+  const bestFromSrcset = (v) => {
+    const parts = String(v).split(',').map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return '';
+    return parts[parts.length - 1].split(/\s+/)[0] || '';
+  };
+  // 按标签解析，避免跨属性误匹配；优先常规/懒加载属性，仅有响应式 srcset 时兜底
+  const imgRe = /<img\b[^>]*>/gi;
   let m;
-  while ((m = re.exec(content))) {
-    if (m[1] && !srcs.includes(m[1])) srcs.push(m[1]);
+  while ((m = imgRe.exec(content))) {
+    const tag = m[0];
+    const candidates = ['src', 'data-src', 'data-original', 'data-actualsrc']
+      .map((n) => attrOf(tag, n))
+      .filter((v) => v && !/^(data|blob):/i.test(v));
+    if (candidates.length) {
+      candidates.forEach(push);
+      continue;
+    }
+    const srcset = attrOf(tag, 'srcset') || attrOf(tag, 'data-srcset');
+    if (srcset) push(bestFromSrcset(srcset));
   }
+  // 内联样式背景图：微信公众号等常用 background-image 承载正文图片
+  const bgRe = /background(?:-image)?\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+  while ((m = bgRe.exec(content))) push(m[1]);
   return srcs;
 }
 
@@ -93,7 +123,7 @@ export async function updateClip(id, data) {
   const imageSource = data.content !== undefined || hasImages
     ? [...new Set([...explicitImages, ...contentImages])]
     : undefined;
-  const { replace } = await localizeImages(imageSource, id);
+  const { replace } = await localizeImages(imageSource, id, data.url || existing.url);
   const newContent = data.content !== undefined ? rewriteContentImages(data.content, replace) : existing.content;
   const newMarkdown = data.markdown !== undefined
     ? data.markdown

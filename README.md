@@ -35,6 +35,7 @@
 - 智能问答（RAG）：基于知识库的多轮对话问答（支持流式输出、按笔记本限定检索范围），回答附带参考来源与代码块排版；未配置 LLM Key 时前端友好提示
 - 站点专项适配：CSDN / 博客园 / 简书 / 掘金 / IT之家 / 少数派 / 阮一峰 / 微信公众号 / 语雀 / GitHub / Medium / InfoQ / SegmentFault / 飞书文档 / 小红书 / 什么值得买 / 通用自建博客（WordPress / Hugo / Hexo / Typecho 等）
 - 服务端智能抓取：URL 粘贴即收藏；识别 JSON-LD（Article / BlogPosting / NewsArticle 等）自动提取标题 / 作者 / 结构化正文，配合 Readability 解析任意常规博客文章，自动清理标题站点后缀与封面占位图
+- 图片本地化：剪藏正文图片（含 `img`、`data-src` 懒加载图、`srcset` 响应式图、CSS `background-image` 背景图）受限并发（4 路）下载到本地并重写链接；下载优先不携带 Referer（防盗链普遍放行空 Referer），失败时按来源页 origin 或微信域名 Referer 重试，兼容微信公众号图片 CDN 防盗链
 
 ### 第四阶段（进阶）
 - 全文 OCR 识别、网页完整存档、浏览器书签同步、协作笔记本、全文翻译（预留接口，按需开发）
@@ -73,24 +74,95 @@ SMTP_USER=your@email.com
 SMTP_PASS=your-password
 ```
 
-### Docker 部署
-
-```bash
-cd deploy
-docker compose up -d
-```
-
-访问 `http://localhost`。数据持久化在 `wc_data` 数据卷中。
-
 ## 部署方式
 
-项目支持多种部署方式：
+项目支持多种部署方式，按需选择。
 
-1. **Docker 容器化**：`deploy/Dockerfile` 打包前端静态文件与后端服务，Nginx 提供静态服务与反向代理，PM2 管理进程，`docker-compose.yml` 一键编排
-2. **传统服务器部署**：前端 `npm run build` 产出静态文件，由 Nginx/Apache 提供；后端 `npm start` 配合 PM2 或 systemd
-3. **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
-4. **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
-5. **Cloudflare Workers / Tunnel**：可参考技术栈说明将 API 与前端迁移至 Cloudflare 边缘网络
+### 方式一：Docker（推荐）
+
+`deploy/` 提供两套镜像与编排：
+
+| 方案 | 文件 | 说明 | 默认端口 |
+|------|------|------|----------|
+| Nginx + PM2 | `deploy/Dockerfile`、`deploy/docker-compose.yml` | Nginx 提供静态文件并反向代理 API，PM2 守护后端，适合服务器长期运行 | 80 |
+| 单容器 | `deploy/Dockerfile.node`、`deploy/docker-compose.node.yml` | 后端以 `SERVE_DIST=true` 同时托管前端，仅暴露一个端口，适合 PaaS | 3001 |
+
+```bash
+# 准备环境变量
+cp deploy/.env.example deploy/.env
+# 编辑 deploy/.env，至少修改 JWT_SECRET 与 PUBLIC_BASE_URL
+
+# Nginx 方案
+docker compose -f deploy/docker-compose.yml up -d --build
+
+# 或单容器方案
+docker compose -f deploy/docker-compose.node.yml up -d --build
+```
+
+访问 `http://localhost`（Nginx 方案）或 `http://localhost:3001`（单容器方案）。数据持久化在 `wc_data` 数据卷中。
+
+### 方式二：传统服务器（Nginx + PM2 / systemd）
+
+```bash
+# 构建前端静态产物
+npm --prefix frontend ci
+npm --prefix frontend run build
+
+# 安装后端生产依赖
+npm --prefix backend ci --omit=dev
+
+# 启动后端（PM2 守护）
+cd backend && pm2 start ../deploy/ecosystem.config.cjs
+```
+
+将 `frontend/dist` 交给 Nginx 提供静态文件，并把 `/api`、`/rss`、`/uploads` 反向代理到 `http://127.0.0.1:3001`，可直接参考 `deploy/nginx.conf`（注意调整其中的 `root` 路径）。
+
+不使用 PM2 时，可用 systemd 守护后端，模板见 `deploy/web-clipper.service`：
+
+```bash
+cp deploy/web-clipper.service /etc/systemd/system/web-clipper.service
+# 修改其中的 WorkingDirectory / User / EnvironmentFile 后
+systemctl daemon-reload && systemctl enable --now web-clipper
+```
+
+### 方式三：单端口运行（后端托管前端）
+
+无需 Nginx，后端同时提供静态页面与接口：
+
+```bash
+npm --prefix frontend ci && npm --prefix frontend run build
+npm --prefix backend ci --omit=dev
+SERVE_DIST=true PORT=3001 node backend/src/server.js
+```
+
+### 方式四：静态托管 + 独立后端（Cloudflare Pages / Netlify / Vercel）
+
+前端为纯静态产物，可托管在任意静态平台，后端单独部署。跨域时通过构建期环境变量指定后端地址（参考 `frontend/.env.example`）：
+
+```bash
+VITE_API_BASE=https://api.example.com/api
+VITE_ASSET_BASE=https://api.example.com
+```
+
+**Cloudflare Pages**：仓库已内置 Pages 配置与代理函数
+
+- `wrangler.toml`：`pages_build_output_dir = "frontend/dist"`
+- `functions/[[path]].js`：在 Pages 边缘把 `/api`、`/rss`、`/uploads` 反向代理到后端
+- `frontend/public/_redirects`：SPA 路由回退；`frontend/public/_headers`：静态资源缓存策略
+
+在 Cloudflare Pages 项目设置中：构建命令 `npm --prefix frontend ci && npm --prefix frontend run build`，输出目录 `frontend/dist`，环境变量 `API_ORIGIN=https://your-backend-domain`。此方案下前后端在浏览器看来同源，正文图片无需改写。
+
+**Render**：仓库根目录 `render.yaml` 提供 Blueprint，一键构建并启动单服务。
+
+**Netlify / Vercel**：后端已启用 CORS，直接配置构建期变量即可跨域访问后端，无需代理函数
+
+- Netlify：`netlify.toml` 已配置构建命令与输出目录；在站点环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
+- Vercel：`vercel.json` 已配置构建命令、输出目录与 SPA 回退；在项目环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
+
+### 方式五：PWA 与浏览器扩展
+
+- **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
+- **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
 
 ## 项目结构
 

@@ -1,4 +1,4 @@
-import api from './client';
+import api, { apiUrl } from './client';
 
 export const authApi = {
   register: (data) => api.post('/auth/register', data),
@@ -82,8 +82,8 @@ export const extractApi = {
 };
 
 export const exportApi = {
-  markdownUrl: (id) => `/api/export/${id}/markdown`,
-  pdfUrl: (id) => `/api/export/${id}/pdf`,
+  markdownUrl: (id) => apiUrl(`/export/${id}/markdown`),
+  pdfUrl: (id) => apiUrl(`/export/${id}/pdf`),
   viewMarkdown: (id) => api.get(`/export/${id}/view-markdown`, { responseType: 'text' })
 };
 

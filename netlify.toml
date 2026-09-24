@@ -1,0 +1,12 @@
+[build]
+  command = "npm --prefix frontend ci && npm --prefix frontend run build"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# 后端已启用 CORS，Netlify 无需代理函数：
+# 在站点环境变量中设置
+#   VITE_API_BASE   = https://api.example.com/api
+#   VITE_ASSET_BASE = https://api.example.com
+# SPA 路由回退由 frontend/public/_redirects 提供，静态资源缓存由 _headers 提供。

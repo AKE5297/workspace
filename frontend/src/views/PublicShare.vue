@@ -23,7 +23,7 @@
         <p>{{ clip.summary }}</p>
       </div>
       <div class="share-content">
-        <div v-if="clip.content" class="content-html" v-html="clip.content"></div>
+        <div v-if="clip.content" class="content-html" v-html="displayContent"></div>
         <div v-else class="content-text" v-html="renderText"></div>
       </div>
     </template>
@@ -34,6 +34,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { shareApi } from '@/api';
+import { resolveAssets } from '@/api/client';
 
 const route = useRoute();
 const clip = ref(null);
@@ -41,7 +42,8 @@ const loading = ref(true);
 const error = ref('');
 const viewCount = ref(0);
 
-const renderText = computed(() => (clip.value?.text || '').replace(/\n/g, '<br/>'));
+const renderText = computed(() => resolveAssets((clip.value?.text || '').replace(/\n/g, '<br/>')));
+const displayContent = computed(() => resolveAssets(clip.value?.content || ''));
 
 async function load() {
   loading.value = true;

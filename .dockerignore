@@ -1,0 +1,23 @@
+# 依赖与构建产物（镜像内重新安装/构建）
+**/node_modules
+**/dist
+
+# 运行期数据：必须通过数据卷挂载，不打进镜像
+backend/data
+
+# 环境变量与密钥文件
+**/.env
+
+# 版本控制与本地配置
+.git
+.gitignore
+*.log
+.DS_Store
+.idea
+.vscode
+
+# 与镜像构建无关的目录
+extension
+scripts
+.monkeycode
+functions

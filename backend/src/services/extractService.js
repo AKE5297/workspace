@@ -26,21 +26,28 @@ function decodeBuffer(buffer, charset) {
 }
 
 function absolutizeImages(html, baseUrl) {
-  return String(html).replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
+  const absolutize = (u) => {
+    const url = String(u || '').trim();
+    // 保留已是绝对地址、内联数据、以及 SVG 片段引用（url(#id)）
+    if (!url || url.startsWith('#') || /^(https?:)?\/\//i.test(url) || url.startsWith('data:')) return u;
+    try {
+      return new URL(url, baseUrl).href;
+    } catch (e) {
+      return u;
+    }
+  };
+
+  // 先绝对化全站内联样式里的背景图 URL（背景图常挂在 section/div 而非 img 上）
+  let out = String(html).replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (mm, q, u) => {
+    return `url(${q}${absolutize(u)}${q})`;
+  });
+
+  return out.replace(/<(img|source)([^>]*?)>/gi, (m, tag, attrs) => {
     let newAttrs = attrs;
 
     const dataSrcMatch = /\sdata-src=["']([^"']+)["']/i.exec(attrs);
     const srcMatch = /\ssrc=["']([^"']*)["']/i.exec(attrs);
     const hasRealSrc = srcMatch && srcMatch[1] && !/^data:/i.test(srcMatch[1]);
-
-    const absolutize = (u) => {
-      if (/^(https?:)?\/\//i.test(u) || u.startsWith('data:')) return u;
-      try {
-        return new URL(u, baseUrl).href;
-      } catch (e) {
-        return u;
-      }
-    };
 
     if (dataSrcMatch) {
       const dsrc = absolutize(dataSrcMatch[1]);

@@ -37,6 +37,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(config.uploadsDir));
 
+// API 响应禁止缓存：避免浏览器对无缓存头的 GET 响应做启发式缓存，导致切换模块后读到陈旧数据
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/clips', clipRoutes);
 app.use('/api/tags', tagRoutes);

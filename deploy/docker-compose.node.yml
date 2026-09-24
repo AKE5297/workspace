@@ -1,0 +1,31 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.node
+    image: web-clipper-node:latest
+    container_name: web-clipper-node
+    init: true
+    ports:
+      - "${HTTP_PORT:-3001}:3001"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DATA_DIR=/app/backend/data
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:3001}
+      - USER_LLM_API_KEY=${USER_LLM_API_KEY:-}
+      - USER_LLM_BASE_URL=${USER_LLM_BASE_URL:-https://api.deepseek.com/v1}
+      - USER_LLM_MODEL=${USER_LLM_MODEL:-deepseek-chat}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    volumes:
+      - wc_data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  wc_data:

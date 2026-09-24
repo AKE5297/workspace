@@ -1,0 +1,14 @@
+# Cloudflare Pages 配置（`wrangler pages deploy` 或 Dashboard 连接 Git 仓库均可）
+#
+# 前端构建产物目录
+pages_build_output_dir = "frontend/dist"
+
+name = "web-clipper"
+compatibility_date = "2024-11-01"
+
+# Pages Functions（functions/[[path]].js）会把 /api、/rss、/uploads 代理到后端。
+# 请在后端服务上部署本仓库的 backend，并在 Cloudflare Pages 项目设置中配置：
+#   API_ORIGIN = https://your-backend-domain
+# 也可取消下面注释，用 vars 直接声明（值需替换为真实后端地址）：
+# [vars]
+# API_ORIGIN = "https://api.example.com"

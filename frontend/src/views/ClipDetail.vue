@@ -61,7 +61,7 @@
 
         <el-divider v-if="clip.content || markdownText" />
         <div v-if="markdownView && markdownText" class="markdown-view" v-html="renderedMarkdown"></div>
-        <div v-else-if="clip.content" class="reader-html" :class="{ 'reading-mode': readingMode }" v-html="clip.content"></div>
+        <div v-else-if="clip.content" class="reader-html" :class="{ 'reading-mode': readingMode }" v-html="displayContent"></div>
 
         <div v-else-if="clip.text" class="plain-text" v-html="renderText"></div>
       </div>
@@ -120,7 +120,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowLeft, Share, Reading, Star, Link, Document, Download, ArrowDown } from '@element-plus/icons-vue';
 import { marked } from 'marked';
 import { clipApi, notebookApi, shareApi, exportApi } from '@/api';
-import api from '@/api/client';
+import api, { resolveAssets } from '@/api/client';
 import ClipEditor from '@/components/ClipEditor.vue';
 
 const route = useRoute();
@@ -138,14 +138,16 @@ const expiresIn = ref(null);
 
 const renderText = computed(() => {
   if (!clip.value?.text) return '';
-  return clip.value.text.replace(/\n/g, '<br/>');
+  return resolveAssets(clip.value.text.replace(/\n/g, '<br/>'));
 });
 
 const markdownText = computed(() => clip.value?.markdown || '');
 
+const displayContent = computed(() => resolveAssets(clip.value?.content || ''));
+
 const renderedMarkdown = computed(() => {
   try {
-    return marked.parse(markdownText.value, { gfm: true, breaks: true });
+    return resolveAssets(marked.parse(markdownText.value, { gfm: true, breaks: true }));
   } catch (e) {
     return `<pre>${markdownText.value}</pre>`;
   }

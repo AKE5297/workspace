@@ -1,17 +1,19 @@
-version: '3.8'
-
 services:
   web:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+    image: web-clipper:latest
     container_name: web-clipper
+    init: true
     ports:
-      - "80:80"
+      - "${HTTP_PORT:-80}:80"
     environment:
       - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - DATA_DIR=/app/backend/data
+      # 用于生成分享链接 / RSS 的公开访问地址，按实际域名填写
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
       - USER_LLM_API_KEY=${USER_LLM_API_KEY:-}
       - USER_LLM_BASE_URL=${USER_LLM_BASE_URL:-https://api.deepseek.com/v1}
       - USER_LLM_MODEL=${USER_LLM_MODEL:-deepseek-chat}
@@ -25,11 +27,6 @@ services:
     volumes:
       - wc_data:/app/backend/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
 volumes:
   wc_data:
