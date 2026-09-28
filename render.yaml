@@ -21,6 +21,8 @@ services:
         generateValue: true
       - key: PUBLIC_BASE_URL
         sync: false
+      - key: CORS_ORIGIN
+        sync: false
       - key: USER_LLM_API_KEY
         sync: false
       - key: USER_LLM_BASE_URL

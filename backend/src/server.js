@@ -32,7 +32,20 @@ const app = express();
 getDb();
 buildIndex();
 
-app.use(cors());
+// CORS：默认 * 放行全部；配置 CORS_ORIGIN 后按白名单放行（逗号分隔多个来源）
+const corsOrigin = (config.corsOrigin || '*').trim();
+app.use(
+  cors({
+    origin:
+      !corsOrigin || corsOrigin === '*'
+        ? true
+        : corsOrigin
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(config.uploadsDir));
@@ -86,9 +99,25 @@ cron.schedule('0 8 * * *', () => {
   console.log('[cron] 每日八点邮件汇总任务（按需扩展）');
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`[server] Web Clipper backend listening on http://localhost:${config.port}`);
   if (!config.llm.apiKey) {
     console.log('[server] 未配置 USER_LLM_API_KEY，AI 摘要/智能标签功能将返回空结果');
   }
 });
+
+// 优雅停机：容器/进程管理器发送 SIGTERM 时先停止接收新连接，再等待存量请求完成
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] 收到 ${signal}，正在优雅退出...`);
+  server.close(() => {
+    console.log('[server] 已关闭全部连接，进程退出');
+    process.exit(0);
+  });
+  // 兜底：10 秒内仍未关闭则强制退出，避免容器停不下来
+  setTimeout(() => process.exit(0), 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -72,7 +72,11 @@ TELEGRAM_CHAT_ID=your-chat-id
 SMTP_HOST=smtp.example.com
 SMTP_USER=your@email.com
 SMTP_PASS=your-password
+PUBLIC_BASE_URL=https://your-domain.com
+CORS_ORIGIN=https://your-frontend-domain.com
 ```
+
+`PUBLIC_BASE_URL` 用于生成分享链接与 RSS；`CORS_ORIGIN` 默认 `*` 放行全部，前后端分离部署时建议收紧为前端域名（多个用英文逗号分隔）。
 
 ## 部署方式
 

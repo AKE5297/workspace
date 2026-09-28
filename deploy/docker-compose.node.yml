@@ -13,6 +13,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - DATA_DIR=/app/backend/data
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:3001}
+      # 前后端分离部署时限制跨域来源，多个用逗号分隔；同源部署保持默认 *
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - USER_LLM_API_KEY=${USER_LLM_API_KEY:-}
       - USER_LLM_BASE_URL=${USER_LLM_BASE_URL:-https://api.deepseek.com/v1}
       - USER_LLM_MODEL=${USER_LLM_MODEL:-deepseek-chat}
@@ -26,6 +28,13 @@ services:
     volumes:
       - wc_data:/app/backend/data
     restart: unless-stopped
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   wc_data:

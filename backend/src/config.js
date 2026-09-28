@@ -32,5 +32,8 @@ export default {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || ''
   },
-  publicBaseUrl: process.env.PUBLIC_BASE_URL || ''
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
+  // 允许的跨域来源：默认 * 放行全部（本地开发同源代理场景无 CORS）；
+  // 前后端分离部署时建议设为前端域名，多个用英文逗号分隔，例如 https://app.example.com,https://pages.dev
+  corsOrigin: process.env.CORS_ORIGIN || '*'
 };

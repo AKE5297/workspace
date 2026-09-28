@@ -25,7 +25,8 @@ WORKDIR /app
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/frontend/dist ./frontend/dist
 
-RUN mkdir -p /app/backend/data/clips /app/backend/data/uploads
+RUN mkdir -p /app/backend/data/clips /app/backend/data/uploads \
+    && chown -R node:node /app/backend/data
 
 ENV NODE_ENV=production \
     SERVE_DIST=true \
@@ -33,6 +34,9 @@ ENV NODE_ENV=production \
     DATA_DIR=/app/backend/data
 
 EXPOSE 3001
+
+# 以非 root 用户运行，降低容器权限
+USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q -O - http://127.0.0.1:3001/api/health || exit 1
