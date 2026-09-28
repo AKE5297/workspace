@@ -163,6 +163,20 @@ VITE_ASSET_BASE=https://api.example.com
 - Netlify：`netlify.toml` 已配置构建命令与输出目录；在站点环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 - Vercel：`vercel.json` 已配置构建命令、输出目录与 SPA 回退；在项目环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 
+### 备份、健康检查与 HTTPS
+
+```bash
+# 数据备份（JSON 数据 + 本地化图片）
+DATA_DIR=backend/data BACKUP_DIR=./backups ./deploy/backup.sh
+
+# 部署后健康检查
+BASE_URL=http://localhost ./deploy/verify.sh
+```
+
+Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢复时停止服务后解压覆盖数据目录再启动。
+
+需要 HTTPS 时，用 `deploy/nginx.https.conf` 替代 `deploy/nginx.conf`（二选一，避免 upstream 重名），按注释挂载证书与修改域名；证书可用 Certbot 申请。
+
 ### 方式五：PWA 与浏览器扩展
 
 - **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
