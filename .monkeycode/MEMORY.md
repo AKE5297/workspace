@@ -86,3 +86,12 @@ Entries discovered by the Agent during task execution should follow this format:
   - 本 devbox 无 docker / docker compose CLI，Dockerfile 与 compose 无法在本地构建验证，只能在目标主机验证
   - 本 devbox 内存紧张（总内存约 8GB，可用常低于 300MB），编译/构建任务须走后台终端并限制 CPU，避免与运行中的前后端服务争抢内存
 
+[Project Knowledge Summary]
+- Date: 2026-09-29
+- Context: Discovered by Agent while adding Windows 一键部署 scripts (deploy/windows/)
+- Category: Build Methods
+- Instructions:
+  - Windows 本地部署要求 Node.js 20+（Vite 6 与 jsdom 29 的下限），脚本按此版本下限检测
+  - 含中文的 PowerShell 脚本（.ps1）必须保存为 UTF-8 with BOM，否则 Windows PowerShell 5.1 会按系统 ANSI 代码页解析而出现乱码
+  - 一键部署流程：检测/安装 Node（winget 优先，失败回退官方 MSI 静默安装）→ npm ci 安装前后端依赖 → 生成 backend/.env → 启动服务并打开浏览器
+
