@@ -163,6 +163,27 @@ VITE_ASSET_BASE=https://api.example.com
 - Netlify：`netlify.toml` 已配置构建命令与输出目录；在站点环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 - Vercel：`vercel.json` 已配置构建命令、输出目录与 SPA 回退；在项目环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 
+### 方式五：Windows 一键部署（本地测试）
+
+面向 Windows 本地测试，脚本自动安装 Node.js、安装依赖、启动服务并打开浏览器（管理员权限由脚本自行申请）。
+
+- `deploy/windows/一键部署.bat`：双击即可。开发模式，前后端热更新，完成后自动打开 `http://localhost:5173`
+- `deploy/windows/install.ps1`：主逻辑，可在 PowerShell 中带参数运行
+  - `-Prod`：构建前端并以单端口方式启动（`http://localhost:3001`）
+  - `-InstallOnly`：仅安装环境与依赖，不启动服务
+
+```powershell
+# 生产模式
+powershell -ExecutionPolicy Bypass -File .\deploy\windows\install.ps1 -Prod
+```
+
+要求 Windows 10 及以上、PowerShell 5.1。未检测到 Node.js 时优先用 winget 安装 LTS，无 winget 时下载官方 MSI 静默安装；依赖安装失败时会提示切换 npm 镜像。
+
+### 方式六：PWA 与浏览器扩展
+
+- **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
+- **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
+
 ### 备份、健康检查与 HTTPS
 
 ```bash
@@ -176,11 +197,6 @@ BASE_URL=http://localhost ./deploy/verify.sh
 Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢复时停止服务后解压覆盖数据目录再启动。
 
 需要 HTTPS 时，用 `deploy/nginx.https.conf` 替代 `deploy/nginx.conf`（二选一，避免 upstream 重名），按注释挂载证书与修改域名；证书可用 Certbot 申请。
-
-### 方式五：PWA 与浏览器扩展
-
-- **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
-- **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
 
 ## 项目结构
 
