@@ -103,7 +103,7 @@ CORS_ORIGIN=https://your-frontend-domain.com
 | 二、传统服务器 | Nginx + PM2 / systemd | `deploy/nginx.conf`、`deploy/ecosystem.config.cjs`、`deploy/web-clipper.service` |
 | 三、单端口运行 | 无需 Nginx，后端托管前端 | `SERVE_DIST=true` |
 | 四、静态托管 + 独立后端 | Cloudflare Pages / Netlify / Vercel / Render | `wrangler.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
-| 五、Windows 一键部署 | 本地测试 | `deploy/windows/一键部署.bat` |
+| 五、Windows 一键部署 | 本地测试 | `deploy/windows/一键部署.cmd`、`一键部署.bat` |
 | 六、PWA / 浏览器扩展 | 桌面安装、反爬站点剪藏 | `frontend/public/`、`extension/` |
 
 ### 方式一：Docker（推荐）
@@ -189,19 +189,20 @@ VITE_ASSET_BASE=https://api.example.com
 
 ### 方式五：Windows 一键部署（本地测试）
 
-面向 Windows 本地测试，脚本自动安装 Node.js、安装依赖、启动服务并打开浏览器（管理员权限由脚本自行申请）。
+面向 Windows 本地测试，脚本自动安装 Node.js、安装依赖、启动服务并打开浏览器。提供两种入口：
 
-- `deploy/windows/一键部署.bat`：双击即可。开发模式，前后端热更新，完成后自动打开 `http://localhost:5173`
-- `deploy/windows/install.ps1`：主逻辑，可在 PowerShell 中带参数运行
+- `deploy/windows/一键部署.cmd`：纯批处理版，双击即用，无需 PowerShell。检测到 Node.js 缺失或版本过低时用 winget 安装 LTS，随后安装依赖并启动前后端（`http://localhost:5173`）
+- `deploy/windows/一键部署.bat` + `install.ps1`：完整版，功能更全
+  - 默认：开发模式启动，前后端热更新
   - `-Prod`：构建前端并以单端口方式启动（`http://localhost:3001`）
   - `-InstallOnly`：仅安装环境与依赖，不启动服务
 
 ```powershell
-# 生产模式
+# 完整版生产模式
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\install.ps1 -Prod
 ```
 
-要求 Windows 10 及以上、PowerShell 5.1。未检测到 Node.js 时优先用 winget 安装 LTS，无 winget 时下载官方 MSI 静默安装；依赖安装失败时会提示切换 npm 镜像。
+要求 Windows 10 及以上。未检测到 Node.js 时优先用 winget 安装 LTS；PowerShell 完整版在无 winget 时会回退下载官方 MSI 静默安装，依赖安装失败时会提示切换 npm 镜像。
 
 ### 方式六：PWA 与浏览器扩展
 
