@@ -93,5 +93,6 @@ Entries discovered by the Agent during task execution should follow this format:
 - Instructions:
   - Windows 本地部署要求 Node.js 20+（Vite 6 与 jsdom 29 的下限），脚本按此版本下限检测
   - 含中文的 PowerShell 脚本（.ps1）必须保存为 UTF-8 with BOM，否则 Windows PowerShell 5.1 会按系统 ANSI 代码页解析而出现乱码
+  - 含中文的 .cmd/.bat 脚本使用 UTF-8 无 BOM + 首行 chcp 65001，且行尾必须为 CRLF（LF 行尾下标签/goto 可能解析异常）
   - 一键部署流程：检测/安装 Node（winget 优先，失败回退官方 MSI 静默安装）→ npm ci 安装前后端依赖 → 生成 backend/.env → 启动服务并打开浏览器
 
