@@ -1,6 +1,21 @@
 # Web Clipper 网页剪藏工具
 
-一个功能完整的网页剪藏工具，支持内容保存、检索、分类管理、批注、AI 摘要、RSS 订阅、分享链接等核心功能。
+一个自托管的网页剪藏与个人知识管理工具：把网页正文、图片完整保存到本地，并通过检索、标签、笔记本、AI 摘要与知识库问答，把碎片信息沉淀为可检索的知识资产。
+
+## 项目介绍
+
+Web Clipper 面向希望数据自持、不把剪藏内容交给第三方云服务的个人用户与小型团队。它由浏览器扩展、Web 前端与 Node.js 后端三部分组成，所有内容以 JSON 文件与本地图片的形式存储在你自己掌控的服务器或电脑上。
+
+**核心亮点**
+
+- 剪藏完整：正文、作者、封面与正文图片一并保存，图片自动下载到本地，原站失效也不影响阅读
+- 抓取可靠：针对 CSDN、掘金、微信公众号、知乎、小红书等 18+ 站点做专项适配，结合 JSON-LD 与 Readability 解析常规博客；反爬或懒加载站点可改用浏览器扩展读取已加载页面
+- 知识沉淀：全文检索、标签与二级笔记本、回收站、Markdown/PDF 导出、RSS 输出
+- AI 增强：自动摘要、智能标签、基于知识库的多轮问答（RAG，支持流式输出），未配置 LLM Key 时自动降级
+- 数据自持：JSON 文件加本地图片存储，整个数据目录可直接备份与迁移
+- 部署灵活：Docker、Nginx、单端口、静态托管、Windows 一键脚本等多种方式
+
+**项目状态**：功能可自用、可部署，仍在持续迭代，规划见「开源计划」。
 
 ## 功能特性
 
@@ -81,6 +96,15 @@ CORS_ORIGIN=https://your-frontend-domain.com
 ## 部署方式
 
 项目支持多种部署方式，按需选择。
+
+| 方式 | 适用场景 | 主要入口 |
+|------|----------|----------|
+| 一、Docker | 服务器长期运行，一键编排 | `deploy/Dockerfile`、`deploy/docker-compose.yml` |
+| 二、传统服务器 | Nginx + PM2 / systemd | `deploy/nginx.conf`、`deploy/ecosystem.config.cjs`、`deploy/web-clipper.service` |
+| 三、单端口运行 | 无需 Nginx，后端托管前端 | `SERVE_DIST=true` |
+| 四、静态托管 + 独立后端 | Cloudflare Pages / Netlify / Vercel / Render | `wrangler.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
+| 五、Windows 一键部署 | 本地测试 | `deploy/windows/一键部署.bat` |
+| 六、PWA / 浏览器扩展 | 桌面安装、反爬站点剪藏 | `frontend/public/`、`extension/` |
 
 ### 方式一：Docker（推荐）
 
@@ -214,8 +238,11 @@ Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢�
 │   │   └── api/      # Axios 封装
 │   └── public/       # PWA 配置
 ├── extension/        # Chrome 扩展
-├── deploy/           # Docker / Nginx / PM2 配置
-└── scripts/          # 工具脚本
+├── deploy/           # Docker / Nginx / PM2 / systemd 配置
+│   └── windows/      # Windows 一键部署脚本
+├── functions/        # Cloudflare Pages 边缘代理函数
+├── scripts/          # 工具脚本
+└── LICENSE           # MIT 许可证
 ```
 
 ## 数据存储
@@ -232,3 +259,39 @@ Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢�
 ## 环境变量
 
 后端所有配置项见 `backend/.env.example`，包括端口、JWT 密钥、LLM 配置、Telegram、SMTP 等。生产环境务必修改 `JWT_SECRET`。
+
+## 开源计划
+
+本项目坚持「数据自持 + 可自托管」的定位，以 MIT 许可证开放源代码。
+
+### 版本规划
+
+| 能力 | 内容 | 状态 |
+|------|------|------|
+| 基础剪藏 | 内容保存、检索、标签、笔记本、批注、分享链接、RSS | 已完成 |
+| AI 赋能 | 自动摘要、智能标签、Telegram / 邮件推送（需自备 Key） | 已完成 |
+| 知识管理 | Markdown 标准化、Markdown / PDF / ZIP 导出、全库检索、RAG 问答 | 已完成 |
+| 浏览器扩展 | 共享快照引擎、右键三档剪藏、主流平台 DOM 提取 | 已完成 |
+| 部署体系 | Docker / Nginx / 单端口 / 静态托管 / Windows 一键脚本 | 已完成 |
+| 全文 OCR | 图片与扫描件文字识别并纳入检索 | 计划中 |
+| 网页存档 | 保存整页快照并支持离线回放 | 计划中 |
+| 书签同步 | 导入浏览器书签并批量整理 | 计划中 |
+| 协作笔记 | 多人共享笔记本与权限控制 | 计划中 |
+| 全文翻译 | 剪藏正文多语言翻译 | 计划中 |
+
+阶段规划会随反馈调整，已完成能力以实际代码为准。
+
+### 参与贡献
+
+- 通过 Issue 反馈 Bug 或需求，建议附上复现步骤、期望结果与截图
+- 提交 PR 前请在本地跑通：前端 `npm --prefix frontend run build`、后端 `npm --prefix backend start`
+- 改动尽量聚焦单一问题，保持与现有代码风格和目录约定一致
+- 新增站点抓取适配时，请同时更新后端 `backend/src/services/extractService.js` 与扩展 `extension/snapshot.js` 的规则表
+
+### 免责声明
+
+本项目仅用于个人学习与自用剪藏。请遵守目标网站的 robots 协议、服务条款与版权规定，不得用于批量抓取、商业转载或任何侵权用途。使用本项目产生的任何后果由使用者自行承担。
+
+## 许可证
+
+本项目基于 [MIT License](./LICENSE) 开源，可自由使用、修改与分发，请保留版权声明。
