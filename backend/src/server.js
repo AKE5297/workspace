@@ -86,8 +86,9 @@ if (process.env.SERVE_DIST === 'true' && fs.existsSync(distDir)) {
 }
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: err.message || '服务器内部错误' });
+  const status = err.status || err.statusCode || (err.type === 'entity.parse.failed' ? 400 : 500);
+  if (status >= 500) console.error(err);
+  res.status(status).json({ message: status === 400 ? '请求体格式不正确' : err.message || '服务器内部错误' });
 });
 
 cron.schedule('0 3 * * *', () => {

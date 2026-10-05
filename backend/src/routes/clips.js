@@ -87,6 +87,8 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/:id/read', (req, res) => {
+  const clip = getDb().clips.find((c) => c.id === req.params.id && c.userId === req.user.id);
+  if (!clip) return res.status(404).json({ message: '剪藏不存在' });
   clipService.recordRead(req.params.id);
   save();
   res.json({ ok: true });
@@ -126,16 +128,17 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
+  const clip = getDb().clips.find((c) => c.id === req.params.id && c.userId === req.user.id);
+  if (!clip) return res.status(404).json({ message: '剪藏不存在' });
   const { recycle = 'true' } = req.query;
   if (recycle === 'true') {
     recycleService.moveToRecycle(req.user.id, [req.params.id]);
     save();
-    res.json({ ok: true, movedToRecycle: true });
-  } else {
-    clipService.hardDelete(req.params.id);
-    save();
-    res.json({ ok: true });
+    return res.json({ ok: true, movedToRecycle: true });
   }
+  clipService.hardDelete(req.params.id);
+  save();
+  res.json({ ok: true });
 });
 
 export default router;

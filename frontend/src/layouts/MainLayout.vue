@@ -2,8 +2,9 @@
   <el-container class="main-layout">
     <el-aside width="220px" class="desktop-only aside">
       <div class="logo">
-        <el-icon :size="22" color="var(--wc-color)"><Scissor /></el-icon>
-        <span>Web Clipper</span>
+        <img v-if="settings.logoUrl" :src="settings.logoUrl" class="logo-img" alt="logo" />
+        <el-icon v-else :size="22" color="var(--wc-color)"><Scissor /></el-icon>
+        <span v-if="settings.logoText">{{ settings.logoText }}</span>
       </div>
       <el-menu :default-active="activeMenu" router class="menu">
         <el-menu-item index="/clips"><el-icon><Collection /></el-icon>剪藏列表</el-menu-item>
@@ -59,10 +60,12 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useSettingsStore } from '@/stores/settings';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 
 const tabs = [
   { path: '/clips', label: '首页', icon: 'HomeFilled' },
@@ -115,6 +118,12 @@ function onCommand(cmd) {
   font-size: 17px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+}
+.logo-img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 .menu {
   border-right: none;

@@ -20,9 +20,24 @@ export const useSettingsStore = defineStore('settings', {
     summaryEnabled: true,
     tagEnabled: true,
     tagCount: 5,
+    logoUrl: '',
+    logoText: 'Web Clipper',
     loaded: false
   }),
   actions: {
+    applyLogo() {
+      const url = this.logoUrl || '/icons/icon-192.png';
+      const link = document.querySelector("link[rel='icon']") || document.getElementById('site-favicon');
+      if (link) {
+        link.href = url;
+      } else {
+        const el = document.createElement('link');
+        el.rel = 'icon';
+        el.id = 'site-favicon';
+        el.href = url;
+        document.head.appendChild(el);
+      }
+    },
     applyTheme() {
       const root = document.documentElement;
       root.style.setProperty('--wc-color', this.themeColor);
@@ -73,8 +88,13 @@ export const useSettingsStore = defineStore('settings', {
       if (localColor) this.themeColor = localColor;
       const localDark = localStorage.getItem('wc_dark_mode');
       if (localDark) this.darkMode = localDark;
+      const localLogo = localStorage.getItem('wc_logo_url');
+      if (localLogo !== null) this.logoUrl = localLogo;
+      const localLogoText = localStorage.getItem('wc_logo_text');
+      if (localLogoText !== null) this.logoText = localLogoText;
       this.applyTheme();
       this.applyDark();
+      this.applyLogo();
     },
     async fetchRemote() {
       try {
@@ -84,11 +104,16 @@ export const useSettingsStore = defineStore('settings', {
         this.summaryEnabled = data.summaryEnabled;
         this.tagEnabled = data.tagEnabled;
         this.tagCount = data.tagCount;
+        this.logoUrl = data.logoUrl || '';
+        this.logoText = data.logoText || 'Web Clipper';
         this.loaded = true;
         localStorage.setItem('wc_theme_color', this.themeColor);
         localStorage.setItem('wc_dark_mode', this.darkMode);
+        localStorage.setItem('wc_logo_url', this.logoUrl);
+        localStorage.setItem('wc_logo_text', this.logoText);
         this.applyTheme();
         this.applyDark();
+        this.applyLogo();
       } catch (e) {
         /* 未登录时忽略 */
       }
@@ -107,6 +132,16 @@ export const useSettingsStore = defineStore('settings', {
       this.applyDark();
       try {
         await settingsApi.update({ darkMode: mode });
+      } catch (e) { /* ignore */ }
+    },
+    async setLogo({ url, text } = {}) {
+      if (url !== undefined) this.logoUrl = url || '';
+      if (text !== undefined) this.logoText = text;
+      localStorage.setItem('wc_logo_url', this.logoUrl);
+      localStorage.setItem('wc_logo_text', this.logoText);
+      this.applyLogo();
+      try {
+        await settingsApi.update({ logoUrl: this.logoUrl, logoText: this.logoText });
       } catch (e) { /* ignore */ }
     }
   }

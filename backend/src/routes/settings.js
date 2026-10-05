@@ -11,7 +11,8 @@ router.get('/', (req, res) => {
     themeColor, darkMode, summaryEnabled, tagEnabled, tagCount,
     telegramEnabled, telegramBotToken, telegramChatId, telegramTemplate,
     telegramPushWindow, telegramPushStart, telegramPushEnd,
-    emailEnabled, emailRecipient, emailMode
+    emailEnabled, emailRecipient, emailMode,
+    logoUrl, logoText
   } = s;
   res.json({
     themeColor: themeColor || '#409eff',
@@ -28,7 +29,9 @@ router.get('/', (req, res) => {
     telegramPushEnd: telegramPushEnd || 22,
     emailEnabled: Boolean(emailEnabled),
     emailRecipient: emailRecipient || '',
-    emailMode: emailMode || 'realtime'
+    emailMode: emailMode || 'realtime',
+    logoUrl: logoUrl || '',
+    logoText: logoText || 'Web Clipper'
   });
 });
 
@@ -39,7 +42,8 @@ router.put('/', (req, res) => {
     'themeColor', 'darkMode', 'summaryEnabled', 'tagEnabled', 'tagCount',
     'telegramEnabled', 'telegramBotToken', 'telegramChatId', 'telegramTemplate',
     'telegramPushWindow', 'telegramPushStart', 'telegramPushEnd',
-    'emailEnabled', 'emailRecipient', 'emailMode'
+    'emailEnabled', 'emailRecipient', 'emailMode',
+    'logoUrl', 'logoText'
   ];
   keys.forEach((k) => {
     if (body[k] !== undefined) s[k] = body[k];
