@@ -102,7 +102,7 @@ CORS_ORIGIN=https://your-frontend-domain.com
 | 一、Docker | 服务器长期运行，一键编排 | `deploy/Dockerfile`、`deploy/docker-compose.yml` |
 | 二、传统服务器 | Nginx + PM2 / systemd | `deploy/nginx.conf`、`deploy/ecosystem.config.cjs`、`deploy/web-clipper.service` |
 | 三、单端口运行 | 无需 Nginx，后端托管前端 | `SERVE_DIST=true` |
-| 四、静态托管 + 独立后端 | Cloudflare Pages / Netlify / Vercel / Render | `wrangler.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
+| 四、静态托管 + 独立后端 | Cloudflare Pages / Workers / Netlify / Vercel / Render | `wrangler.toml`、`wrangler.workers.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
 | 五、Windows 一键部署 | 本地测试 | `deploy/windows/一键部署.cmd`、`一键部署.bat` |
 | 六、PWA / 浏览器扩展 | 桌面安装、反爬站点剪藏 | `frontend/public/`、`extension/` |
 
@@ -163,7 +163,7 @@ npm --prefix backend ci --omit=dev
 SERVE_DIST=true PORT=3001 node backend/src/server.js
 ```
 
-### 方式四：静态托管 + 独立后端（Cloudflare Pages / Netlify / Vercel）
+### 方式四：静态托管 + 独立后端（Cloudflare / Netlify / Vercel）
 
 前端为纯静态产物，可托管在任意静态平台，后端单独部署。跨域时通过构建期环境变量指定后端地址（参考 `frontend/.env.example`）：
 
@@ -172,13 +172,17 @@ VITE_API_BASE=https://api.example.com/api
 VITE_ASSET_BASE=https://api.example.com
 ```
 
-**Cloudflare Pages**：仓库已内置 Pages 配置与代理函数
+**Cloudflare（Pages 或 Workers，任选其一）**：仓库同时内置两套边缘代理配置
 
-- `wrangler.toml`：`pages_build_output_dir = "frontend/dist"`
-- `functions/[[path]].js`：在 Pages 边缘把 `/api`、`/rss`、`/uploads` 反向代理到后端
-- `frontend/public/_redirects`：SPA 路由回退；`frontend/public/_headers`：静态资源缓存策略
+- **Cloudflare Pages**：`wrangler.toml` + `functions/[[path]].js`
+  - Dashboard → Workers & Pages → Create → Pages → 连接 Git，构建命令 `npm --prefix frontend ci && npm --prefix frontend run build`，输出目录 `frontend/dist`，环境变量 `API_ORIGIN=https://your-backend-domain`
+  - 或用 CLI：`wrangler pages deploy frontend/dist --project-name web-clipper`
+- **Cloudflare Workers**（Static Assets）：`wrangler.workers.toml` + `workers/index.js`
+  - `wrangler secret put API_ORIGIN --config wrangler.workers.toml`
+  - `wrangler deploy --config wrangler.workers.toml`
+- 两种方式都在边缘把 `/api`、`/rss`、`/uploads` 反向代理到后端，前后端在浏览器看来同源，正文图片无需改写
 
-在 Cloudflare Pages 项目设置中：构建命令 `npm --prefix frontend ci && npm --prefix frontend run build`，输出目录 `frontend/dist`，环境变量 `API_ORIGIN=https://your-backend-domain`。此方案下前后端在浏览器看来同源，正文图片无需改写。
+Cloudflare 的完整分步教程（含构建配置、自定义域名、缓存、回滚与排错）见 `docs/cloudflare-deploy.md`。
 
 **Render**：仓库根目录 `render.yaml` 提供 Blueprint，一键构建并启动单服务。
 
@@ -242,6 +246,8 @@ Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢�
 ├── deploy/           # Docker / Nginx / PM2 / systemd 配置
 │   └── windows/      # Windows 一键部署脚本
 ├── functions/        # Cloudflare Pages 边缘代理函数
+├── workers/          # Cloudflare Workers 边缘代理入口
+├── docs/             # 部署等专项文档（如 docs/cloudflare-deploy.md）
 ├── scripts/          # 工具脚本
 └── LICENSE           # MIT 许可证
 ```
