@@ -5,37 +5,16 @@
 //   2. 构建命令：npm --prefix frontend ci && npm --prefix frontend run build
 //   3. 构建输出目录：frontend/dist
 // 这样前端与后端在浏览器看来同源，正文中的 /uploads 图片无需重写。
-const PROXY_PREFIXES = ['/api', '/rss', '/uploads'];
+//
+// 代理范围由 frontend/public/_routes.json 收敛到上述前缀，
+// 静态资源与 SPA 路由不会触发本函数，节省调用次数。
+import { shouldProxy, proxyRequest } from '../shared/cloudflareProxy.js';
 
 export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
 
-  const shouldProxy = PROXY_PREFIXES.some(
-    (prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`)
-  );
-  if (!shouldProxy) return next();
+  if (!shouldProxy(url.pathname)) return next();
 
-  const origin = String(env.API_ORIGIN || '').replace(/\/+$/, '');
-  if (!origin) {
-    return new Response('Missing API_ORIGIN environment variable', { status: 500 });
-  }
-
-  const target = new URL(url.pathname + url.search, origin);
-  const headers = new Headers(request.headers);
-  headers.delete('host');
-  headers.set('X-Forwarded-Host', url.host);
-  headers.set('X-Forwarded-Proto', url.protocol.replace(':', ''));
-
-  const init = {
-    method: request.method,
-    headers,
-    redirect: 'manual'
-  };
-  // GET/HEAD 无请求体；其余方法转发原始流（支持文件上传）
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    init.body = request.body;
-  }
-
-  return fetch(new Request(target.toString(), init));
+  return proxyRequest(request, env.API_ORIGIN);
 }

@@ -1,10 +1,12 @@
 # Cloudflare Pages 配置（`wrangler pages deploy` 或 Dashboard 连接 Git 仓库均可）
 #
+# 首次部署时请把 compatibility_date 改为当天日期（Cloudflare 建议使用当天日期）。
+#
 # 前端构建产物目录
 pages_build_output_dir = "frontend/dist"
 
 name = "web-clipper"
-compatibility_date = "2024-11-01"
+compatibility_date = "2026-10-10"
 
 # Pages Functions（functions/[[path]].js）会把 /api、/rss、/uploads 代理到后端。
 # 请在后端服务上部署本仓库的 backend，并在 Cloudflare Pages 项目设置中配置：

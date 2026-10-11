@@ -1,18 +1,26 @@
 # Cloudflare Workers 配置（静态资源 + Worker 代理）
 # 部署：wrangler deploy --config wrangler.workers.toml
 #
+# Cloudflare 现推荐新项目优先使用 Workers Static Assets（本项目即采用此方式）。
 # 与 wrangler.toml（Cloudflare Pages 配置）互不影响，按需选择其一。
 # Pages 方案请使用根目录 wrangler.toml 与 functions/；Workers 方案请使用本文件与 workers/。
+#
+# 首次部署时请把 compatibility_date 改为当天日期。
 
 name = "web-clipper"
 main = "workers/index.js"
-compatibility_date = "2024-11-01"
+compatibility_date = "2026-10-10"
 
 # 前端构建产物作为静态资源，绑定到 Worker 的 env.ASSETS
 [assets]
 directory = "./frontend/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# 让代理路径始终先经过 Worker：
+#   兼容日期 >= 2025-04-01 时，浏览器「导航请求」（如直接打开 /rss/... 订阅地址）
+#   在 single-page-application 模式下会被直接返回 index.html 而不经过 Worker，
+#   这里显式声明这些前缀必须走 Worker，保证 API 与 RSS 代理生效。
+run_worker_first = ["/api/*", "/rss/*", "/uploads/*"]
 
 # 后端地址：推荐用 `wrangler secret put API_ORIGIN --config wrangler.workers.toml` 配置，
 # 也可取消下面注释直接声明（会写入配置，勿放密钥）：

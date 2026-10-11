@@ -55,6 +55,12 @@ Web Clipper 面向希望数据自持、不把剪藏内容交给第三方云服�
 ### 第四阶段（进阶）
 - 全文 OCR 识别、网页完整存档、浏览器书签同步、协作笔记本、全文翻译（预留接口，按需开发）
 
+### 交互与可用性
+- 统一导航：剪藏详情页保留侧边栏与移动端导航；移动端底部 Tab 增加「更多」入口，覆盖知识库、智能问答、草稿箱、统计、回收站、分享管理与设置全部页面，并修正菜单高亮
+- 操作逻辑：草稿箱「继续编辑」复用原草稿（不再产生重复草稿）、编辑任一字段自动存本地草稿；分享对话框读取已有分享，关闭分享不再新建记录；未知路由自动回到剪藏列表
+- 编辑保护：编辑抽屉存在未保存修改时，点击取消、关闭图标或遮罩会二次确认，避免误丢内容
+- 反馈与一致性：列表页加载失败统一提示；日期时间格式全站统一（`utils/date.js`）；统计与知识库空值兜底，避免图表异常
+
 ## 技术栈
 
 - 前端：Vue 3 + Element Plus + Pinia + Vue Router + ECharts
@@ -95,18 +101,21 @@ CORS_ORIGIN=https://your-frontend-domain.com
 
 ## 部署方式
 
-项目支持多种部署方式，按需选择。
+项目支持多种部署方式，按需选择。点击各方式标题可展开详细步骤。
 
 | 方式 | 适用场景 | 主要入口 |
 |------|----------|----------|
-| 一、Docker | 服务器长期运行，一键编排 | `deploy/Dockerfile`、`deploy/docker-compose.yml` |
-| 二、传统服务器 | Nginx + PM2 / systemd | `deploy/nginx.conf`、`deploy/ecosystem.config.cjs`、`deploy/web-clipper.service` |
-| 三、单端口运行 | 无需 Nginx，后端托管前端 | `SERVE_DIST=true` |
-| 四、静态托管 + 独立后端 | Cloudflare Pages / Workers / Netlify / Vercel / Render | `wrangler.toml`、`wrangler.workers.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
-| 五、Windows 一键部署 | 本地测试 | `deploy/windows/一键部署.cmd`、`一键部署.bat` |
-| 六、PWA / 浏览器扩展 | 桌面安装、反爬站点剪藏 | `frontend/public/`、`extension/` |
+| [一、Docker](#方式一docker推荐) | 服务器长期运行，一键编排 | `deploy/Dockerfile`、`deploy/docker-compose.yml` |
+| [二、传统服务器](#方式二传统服务器nginx--pm2--systemd) | Nginx + PM2 / systemd | `deploy/nginx.conf`、`deploy/ecosystem.config.cjs`、`deploy/web-clipper.service` |
+| [三、单端口运行](#方式三单端口运行后端托管前端) | 无需 Nginx，后端托管前端 | `SERVE_DIST=true` |
+| [四、静态托管 + 独立后端](#方式四静态托管--独立后端cloudflare--netlify--vercel) | Cloudflare Pages / Workers / Netlify / Vercel / Render | `wrangler.toml`、`wrangler.workers.toml`、`netlify.toml`、`vercel.json`、`render.yaml` |
+| [五、Windows 一键部署](#方式五windows-一键部署本地测试) | 本地测试 | `deploy/windows/一键部署.cmd`、`一键部署.bat` |
+| [六、PWA / 浏览器扩展](#方式六pwa-与浏览器扩展) | 桌面安装、反爬站点剪藏 | `frontend/public/`、`extension/` |
 
 ### 方式一：Docker（推荐）
+
+<details>
+<summary>展开：Docker 部署步骤</summary>
 
 `deploy/` 提供两套镜像与编排：
 
@@ -118,6 +127,7 @@ CORS_ORIGIN=https://your-frontend-domain.com
 ```bash
 # 准备环境变量
 cp deploy/.env.example deploy/.env
+
 # 编辑 deploy/.env，至少修改 JWT_SECRET 与 PUBLIC_BASE_URL
 
 # Nginx 方案
@@ -129,7 +139,12 @@ docker compose -f deploy/docker-compose.node.yml up -d --build
 
 访问 `http://localhost`（Nginx 方案）或 `http://localhost:3001`（单容器方案）。数据持久化在 `wc_data` 数据卷中。
 
+</details>
+
 ### 方式二：传统服务器（Nginx + PM2 / systemd）
+
+<details>
+<summary>展开：传统服务器部署步骤</summary>
 
 ```bash
 # 构建前端静态产物
@@ -149,11 +164,17 @@ cd backend && pm2 start ../deploy/ecosystem.config.cjs
 
 ```bash
 cp deploy/web-clipper.service /etc/systemd/system/web-clipper.service
+
 # 修改其中的 WorkingDirectory / User / EnvironmentFile 后
 systemctl daemon-reload && systemctl enable --now web-clipper
 ```
 
+</details>
+
 ### 方式三：单端口运行（后端托管前端）
+
+<details>
+<summary>展开：单端口部署步骤</summary>
 
 无需 Nginx，后端同时提供静态页面与接口：
 
@@ -163,35 +184,88 @@ npm --prefix backend ci --omit=dev
 SERVE_DIST=true PORT=3001 node backend/src/server.js
 ```
 
+</details>
+
 ### 方式四：静态托管 + 独立后端（Cloudflare / Netlify / Vercel）
 
-前端为纯静态产物，可托管在任意静态平台，后端单独部署。跨域时通过构建期环境变量指定后端地址（参考 `frontend/.env.example`）：
+<details>
+<summary>展开：静态托管部署步骤</summary>
+
+前端为纯静态产物，可托管在任意静态平台，后端单独部署。
+
+#### 4.1 通用：跨域直连
+
+跨域时通过构建期环境变量指定后端地址（参考 `frontend/.env.example`）：
 
 ```bash
 VITE_API_BASE=https://api.example.com/api
 VITE_ASSET_BASE=https://api.example.com
 ```
 
-**Cloudflare（Pages 或 Workers，任选其一）**：仓库同时内置两套边缘代理配置
+#### 4.2 Cloudflare（Workers 或 Pages，任选其一）
 
-- **Cloudflare Pages**：`wrangler.toml` + `functions/[[path]].js`
-  - Dashboard → Workers & Pages → Create → Pages → 连接 Git，构建命令 `npm --prefix frontend ci && npm --prefix frontend run build`，输出目录 `frontend/dist`，环境变量 `API_ORIGIN=https://your-backend-domain`
-  - 或用 CLI：`wrangler pages deploy frontend/dist --project-name web-clipper`
-- **Cloudflare Workers**（Static Assets）：`wrangler.workers.toml` + `workers/index.js`
-  - `wrangler secret put API_ORIGIN --config wrangler.workers.toml`
-  - `wrangler deploy --config wrangler.workers.toml`
-- 两种方式都在边缘把 `/api`、`/rss`、`/uploads` 反向代理到后端，前后端在浏览器看来同源，正文图片无需改写
+Cloudflare 现推荐新项目优先使用 **Workers（Static Assets）**。仓库同时内置两套边缘代理配置，都会在边缘把 `/api`、`/rss`、`/uploads` 反向代理到后端，前后端在浏览器看来同源，正文图片无需改写。
 
-Cloudflare 的完整分步教程（含构建配置、自定义域名、缓存、回滚与排错）见 `docs/cloudflare-deploy.md`。
+**方案 A：Cloudflare Workers（推荐）** — `wrangler.workers.toml` + `workers/index.js`
 
-**Render**：仓库根目录 `render.yaml` 提供 Blueprint，一键构建并启动单服务。
+```bash
+# 安装并登录 Wrangler
+npm install -g wrangler@latest
+wrangler login
 
-**Netlify / Vercel**：后端已启用 CORS，直接配置构建期变量即可跨域访问后端，无需代理函数
+# 构建前端（产物 frontend/dist）
+npm --prefix frontend ci && npm --prefix frontend run build
+
+# 配置后端地址（加密 Secret）
+wrangler secret put API_ORIGIN --config wrangler.workers.toml
+
+# 本地预览（http://localhost:8787）
+wrangler dev --config wrangler.workers.toml
+
+# 部署
+wrangler deploy --config wrangler.workers.toml
+```
+
+**方案 B：Cloudflare Pages + Functions** — `wrangler.toml` + `functions/[[path]].js`
+
+```bash
+# Dashboard 连接 Git 时填写：
+#   构建命令：npm --prefix frontend ci && npm --prefix frontend run build
+#   输出目录：frontend/dist
+#   环境变量：API_ORIGIN=https://your-backend-domain
+
+# 或用 CLI 手动部署
+npm --prefix frontend ci && npm --prefix frontend run build
+wrangler pages project create web-clipper --production-branch main
+wrangler pages dev                                  # 本地预览
+wrangler pages deploy                               # 部署
+wrangler pages secret put API_ORIGIN --project-name web-clipper  # 配置后端地址
+```
+
+- Pages 与 Workers 共用 `shared/cloudflareProxy.js` 的转发逻辑
+- `frontend/public/_routes.json` 把 Pages Functions 的调用范围收敛到 `/api`、`/rss`、`/uploads`，静态资源与 SPA 路由不触发函数
+- `wrangler.workers.toml` 的 `run_worker_first` 保证 `/api`、`/rss`、`/uploads` 始终先经过 Worker（RSS 是导航请求，默认会被 SPA 回退拦截）
+- 根目录 `.node-version` 固定构建 Node 为 22
+
+完整的构建命令、部署命令、预览命令、路径与排错见 `docs/cloudflare-deploy.md`。
+
+#### 4.3 Render
+
+仓库根目录 `render.yaml` 提供 Blueprint，一键构建并启动单服务。
+
+#### 4.4 Netlify / Vercel
+
+后端已启用 CORS，直接配置构建期变量即可跨域访问后端，无需代理函数：
 
 - Netlify：`netlify.toml` 已配置构建命令与输出目录；在站点环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 - Vercel：`vercel.json` 已配置构建命令、输出目录与 SPA 回退；在项目环境变量中设置 `VITE_API_BASE`、`VITE_ASSET_BASE`
 
+</details>
+
 ### 方式五：Windows 一键部署（本地测试）
+
+<details>
+<summary>展开：Windows 一键部署步骤</summary>
 
 面向 Windows 本地测试，脚本自动安装 Node.js、安装依赖、启动服务并打开浏览器。提供两种入口：
 
@@ -208,12 +282,22 @@ powershell -ExecutionPolicy Bypass -File .\deploy\windows\install.ps1 -Prod
 
 要求 Windows 10 及以上。未检测到 Node.js 时优先用 winget 安装 LTS；PowerShell 完整版在无 winget 时会回退下载官方 MSI 静默安装，依赖安装失败时会提示切换 npm 镜像。
 
+</details>
+
 ### 方式六：PWA 与浏览器扩展
+
+<details>
+<summary>展开：PWA 与扩展说明</summary>
 
 - **PWA 安装**：内置 Service Worker 与 Web App Manifest，支持离线访问与桌面安装
 - **Chrome 扩展**：`extension/` 目录加载未打包扩展，点击工具栏图标一键剪藏当前页面。扩展内置共享快照引擎（`extension/snapshot.js`），支持懒加载站点自动滚动加载全文后保存（适合小红书/什么值得买等反爬或懒加载页面）；右键菜单提供「保存选区 / 保存整页 / 滚动加载全文后保存」；对微信公众号、知乎等主流平台自动提取作者与正文容器
 
+</details>
+
 ### 备份、健康检查与 HTTPS
+
+<details>
+<summary>展开：备份与 HTTPS 步骤</summary>
 
 ```bash
 # 数据备份（JSON 数据 + 本地化图片）
@@ -227,6 +311,8 @@ Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢�
 
 需要 HTTPS 时，用 `deploy/nginx.https.conf` 替代 `deploy/nginx.conf`（二选一，避免 upstream 重名），按注释挂载证书与修改域名；证书可用 Certbot 申请。
 
+</details>
+
 ## 项目结构
 
 ```
@@ -239,16 +325,21 @@ Docker 数据卷场景的备份命令见 `deploy/backup.sh` 顶部注释；恢�
 │   ├── src/
 │   │   ├── views/    # 页面
 │   │   ├── components/ # 组件（剪藏编辑器等）
+│   │   ├── layouts/  # 布局（侧边栏 / 移动端导航）
+│   │   ├── router/   # 路由
 │   │   ├── stores/   # Pinia 状态
+│   │   ├── utils/    # 通用工具（日期格式化等）
 │   │   └── api/      # Axios 封装
-│   └── public/       # PWA 配置
+│   └── public/       # PWA 配置与静态托管文件（_redirects/_headers/_routes.json）
 ├── extension/        # Chrome 扩展
 ├── deploy/           # Docker / Nginx / PM2 / systemd 配置
 │   └── windows/      # Windows 一键部署脚本
 ├── functions/        # Cloudflare Pages 边缘代理函数
 ├── workers/          # Cloudflare Workers 边缘代理入口
+├── shared/           # Cloudflare 代理共享逻辑（Pages Functions 与 Workers 共用）
 ├── docs/             # 部署等专项文档（如 docs/cloudflare-deploy.md）
 ├── scripts/          # 工具脚本
+├── .node-version     # 构建 Node 版本（静态托管平台自动读取）
 └── LICENSE           # MIT 许可证
 ```
 
