@@ -8,7 +8,7 @@
         <h1>{{ clip.title }}</h1>
         <div class="share-meta">
           <span v-if="clip.author">作者：{{ clip.author }}</span>
-          <span>保存于 {{ formatDate(clip.createdAt) }}</span>
+          <span>保存于 {{ formatDateTime(clip.createdAt) }}</span>
           <span v-if="viewCount">访问 {{ viewCount }} 次</span>
         </div>
         <div v-if="clip.tags && clip.tags.length" class="share-tags">
@@ -35,6 +35,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { shareApi } from '@/api';
 import { resolveAssets } from '@/api/client';
+import { formatDateTime } from '@/utils/date';
 
 const route = useRoute();
 const clip = ref(null);
@@ -56,13 +57,6 @@ async function load() {
   } finally {
     loading.value = false;
   }
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 onMounted(load);

@@ -93,7 +93,7 @@
             <div class="clip-meta">
               <span v-if="clip.domain" class="meta-item">{{ clip.domain }}</span>
               <span v-if="clip.author" class="meta-item">{{ clip.author }}</span>
-              <span class="meta-item">{{ formatDate(clip.createdAt) }}</span>
+              <span class="meta-item">{{ formatDateTime(clip.createdAt) }}</span>
               <span v-if="clip.readCount" class="meta-item"><el-icon><View /></el-icon>{{ clip.readCount }}</span>
             </div>
             <div v-if="clip.tags && clip.tags.length" class="clip-tags">
@@ -128,9 +128,10 @@
       </div>
     </div>
 
-    <el-drawer v-model="editVisible" :title="editingId ? '编辑剪藏' : '新建剪藏'" size="min(720px, 92vw)">
+    <el-drawer v-model="editVisible" :title="editingId ? '编辑剪藏' : '新建剪藏'" size="min(720px, 92vw)" :before-close="confirmCloseEditor">
       <ClipEditor
         v-if="editVisible"
+        ref="editorRef"
         :clip-id="editingId"
         :initial="editingClip"
         :notebooks="notebooks"
@@ -175,9 +176,10 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Search, ArrowDown } from '@element-plus/icons-vue';
-import { clipApi, notebookApi, tagApi, batchApi, exportApi } from '@/api';
+import { clipApi, notebookApi, tagApi, batchApi } from '@/api';
 import api from '@/api/client';
 import { useSettingsStore } from '@/stores/settings';
+import { formatDateTime } from '@/utils/date';
 import ClipEditor from '@/components/ClipEditor.vue';
 
 const route = useRoute();
@@ -200,6 +202,7 @@ const lastSelectedIndex = ref(-1);
 const editVisible = ref(false);
 const editingId = ref(null);
 const editingClip = ref(null);
+const editorRef = ref(null);
 
 const batchVisible = ref(false);
 const batchLoading = ref(false);
@@ -318,7 +321,8 @@ async function batchExport(format) {
   }
 }
 
-async function batchDelete() {  try {
+async function batchDelete() {
+  try {
     await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 条剪藏？将移入回收站`, '批量删除', { type: 'warning' });
   } catch (e) {
     return;
@@ -383,11 +387,14 @@ function onSaved() {
   loadClips();
 }
 
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function confirmCloseEditor(done) {
+  if (editorRef.value?.isDirty?.()) {
+    ElMessageBox.confirm('有未保存的修改，确定放弃？', '放弃修改', { type: 'warning' })
+      .then(() => done())
+      .catch(() => {});
+  } else {
+    done();
+  }
 }
 
 function handleKeydown(e) {

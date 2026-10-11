@@ -46,6 +46,7 @@
 
 <script setup>
 import { onMounted, ref, onUnmounted } from 'vue';
+import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 import { statsApi } from '@/api';
 
@@ -61,8 +62,17 @@ async function load() {
   loading.value = true;
   try {
     const { data } = await statsApi.get();
-    stats.value = data;
-    renderCharts(data);
+    const safe = {
+      monthTrend: [],
+      tagDistribution: [],
+      notebookBars: [],
+      heatmap: [],
+      ...data
+    };
+    stats.value = safe;
+    renderCharts(safe);
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载统计数据失败，请稍后重试');
   } finally {
     loading.value = false;
   }
@@ -125,7 +135,8 @@ function renderCharts(data) {
     const c = echarts.init(heatRef.value);
     const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     const hours = Array.from({ length: 24 }, (_, i) => `${i}时`);
-    const maxV = Math.max(1, ...data.heatmap.flat());
+    const heat = data.heatmap.length ? data.heatmap : weekDays.map(() => hours.map(() => 0));
+    const maxV = Math.max(1, ...heat.flat());
     c.setOption({
       tooltip: { position: 'top' },
       grid: { left: 40, right: 16, top: 16, bottom: 60 },
@@ -134,7 +145,7 @@ function renderCharts(data) {
       visualMap: { min: 0, max: maxV, calculable: true, orient: 'horizontal', left: 'center', bottom: 0 },
       series: [{
         type: 'heatmap',
-        data: data.heatmap.flatMap((row, y) => row.map((v, x) => [x, y, v])),
+        data: heat.flatMap((row, y) => row.map((v, x) => [x, y, v])),
         label: { show: false }
       }]
     });

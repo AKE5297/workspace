@@ -31,12 +31,6 @@ export const notebookApi = {
   remove: (id, params) => api.delete(`/notebooks/${id}`, { params })
 };
 
-export const draftApi = {
-  list: () => api.get('/drafts'),
-  save: (data) => api.post('/drafts', data),
-  remove: (id) => api.delete(`/drafts/${id}`)
-};
-
 export const shareApi = {
   list: () => api.get('/shares/manage'),
   create: (data) => api.post('/shares/manage', data),

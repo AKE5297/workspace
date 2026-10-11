@@ -9,7 +9,7 @@
     </div>
 
     <div v-loading="loading">
-      <div v-if="tags.length === 0" class="empty-state">
+      <div v-if="tags.length === 0 && !loading" class="empty-state">
         <el-empty description="暂无标签" />
       </div>
       <div v-else class="tag-list">
@@ -72,6 +72,8 @@ async function load() {
     const [t, nb] = await Promise.all([tagApi.list(), notebookApi.list()]);
     tags.value = t.data.items;
     notebooks.value = nb.data.items;
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载标签失败，请稍后重试');
   } finally {
     loading.value = false;
   }

@@ -16,7 +16,7 @@
             <div v-if="d.url" class="draft-url text-ellipsis">{{ d.url }}</div>
             <div v-if="d.text" class="draft-excerpt text-ellipsis-2">{{ d.text }}</div>
             <div class="draft-meta">
-              <span>编辑于 {{ formatDate(d.updatedAt) }}</span>
+              <span>编辑于 {{ formatDateTime(d.updatedAt) }}</span>
               <span v-if="d.tags && d.tags.length">标签：{{ d.tags.join(', ') }}</span>
             </div>
           </div>
@@ -28,9 +28,10 @@
       </div>
     </div>
 
-    <el-drawer v-model="editVisible" title="继续编辑草稿" size="min(720px, 92vw)">
+    <el-drawer v-model="editVisible" title="继续编辑草稿" size="min(720px, 92vw)" :before-close="confirmCloseEditor">
       <ClipEditor
         v-if="editVisible"
+        ref="editorRef"
         :initial="editingDraft"
         :notebooks="notebooks"
         @saved="onSaved"
@@ -45,6 +46,7 @@ import { onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { notebookApi } from '@/api';
 import { useLocalDrafts } from '@/stores/localDrafts';
+import { formatDateTime } from '@/utils/date';
 import ClipEditor from '@/components/ClipEditor.vue';
 
 const { list, remove } = useLocalDrafts();
@@ -53,6 +55,7 @@ const notebooks = ref([]);
 const loading = ref(false);
 const editVisible = ref(false);
 const editingDraft = ref(null);
+const editorRef = ref(null);
 
 async function load() {
   loading.value = true;
@@ -94,11 +97,14 @@ function onSaved() {
   load();
 }
 
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function confirmCloseEditor(done) {
+  if (editorRef.value?.isDirty?.()) {
+    ElMessageBox.confirm('有未保存的修改，确定放弃？', '放弃修改', { type: 'warning' })
+      .then(() => done())
+      .catch(() => {});
+  } else {
+    done();
+  }
 }
 
 onMounted(() => {

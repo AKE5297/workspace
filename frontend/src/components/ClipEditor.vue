@@ -25,12 +25,12 @@
           <el-alert type="warning" :closable="false" show-icon>
             <template #title>
               该页面已被剪藏：<strong>{{ duplicateInfo.title }}</strong>
-              （保存于 {{ formatDate(duplicateInfo.createdAt) }}）
+              （保存于 {{ formatDay(duplicateInfo.createdAt) }}）
             </template>
           </el-alert>
           <div class="dup-actions">
             <el-button size="small" type="primary" @click="continueSave">仍然保存</el-button>
-            <el-button size="small" @click="duplicateInfo = null; cancelByDup = true">取消</el-button>
+            <el-button size="small" @click="duplicateInfo = null">取消</el-button>
           </div>
         </div>
       </el-form-item>
@@ -85,7 +85,6 @@
           type="textarea"
           :rows="8"
           placeholder="剪藏正文内容"
-          @input="scheduleDraftSave"
         />
       </el-form-item>
 
@@ -104,7 +103,7 @@
     <div class="editor-footer">
       <el-button @click="saveDraft">存为草稿</el-button>
       <span class="spacer" />
-      <el-button @click="$emit('close')">取消</el-button>
+      <el-button @click="handleCancel">取消</el-button>
       <el-button type="primary" :loading="saving" @click="save">保存</el-button>
     </div>
   </div>
@@ -112,10 +111,11 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { clipApi, tagApi, extractApi } from '@/api';
 import { useSettingsStore } from '@/stores/settings';
 import { useLocalDrafts } from '@/stores/localDrafts';
+import { formatDay } from '@/utils/date';
 
 const props = defineProps({
   clipId: { type: String, default: null },
@@ -142,18 +142,20 @@ const saving = ref(false);
 const duplicateInfo = ref(null);
 const wafHint = ref(false);
 const wafExpanded = ref(false);
-const cancelByDup = ref(false);
 const recommendedTags = ref([]);
 const aiTagLoading = ref(false);
 const aiSummaryLoading = ref(false);
+const draftDbid = ref(null);
+const generatedClipId = ref(null);
+const snapshot = ref('');
 let draftTimer = null;
-const draftSaved = ref(false);
 
 const previewHost = computed(() => window.location.origin);
 
 const isEdit = computed(() => Boolean(props.clipId));
 
 onMounted(() => {
+  draftDbid.value = isEdit.value ? null : props.initial?.id || null;
   if (props.initial) {
     Object.assign(form, {
       title: props.initial.title || '',
@@ -166,7 +168,29 @@ onMounted(() => {
       summary: props.initial.summary || ''
     });
   }
+  snapshot.value = JSON.stringify(form);
 });
+
+function isDirty() {
+  const hasContent = Boolean(form.title || form.url || form.text || form.content);
+  return hasContent && JSON.stringify(form) !== snapshot.value;
+}
+
+async function handleCancel() {
+  if (isDirty()) {
+    try {
+      await ElMessageBox.confirm('有未保存的修改，确定放弃？', '放弃修改', { type: 'warning' });
+    } catch (e) {
+      return;
+    }
+  }
+  emit('close');
+}
+
+defineExpose({ isDirty });
+
+// 任一字段变化都延迟写入本地草稿，避免关闭时丢失编辑
+watch(form, () => scheduleDraftSave(), { deep: true });
 
 async function checkDuplicate() {
   if (!form.url || isEdit.value) return;
@@ -244,7 +268,11 @@ async function genSummary() {
     }
     const { data } = await clipApi.generateSummary(clipId);
     form.summary = data.summary || '';
-    ElMessage.success(data.summary ? '摘要已生成' : '摘要生成失败，请检查 LLM 配置');
+    if (data.summary) {
+      ElMessage.success('摘要已生成');
+    } else {
+      ElMessage.warning('摘要生成失败，请检查 LLM 配置');
+    }
   } catch (e) {
     ElMessage.warning('摘要生成失败：' + e.message);
   } finally {
@@ -258,6 +286,7 @@ function continueSave() {
 }
 
 function scheduleDraftSave() {
+  if (isEdit.value) return;
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
     saveDraft(true);
@@ -266,7 +295,7 @@ function scheduleDraftSave() {
 
 async function saveDraft(silent = false) {
   if (!form.title && !form.url && !form.text) return;
-  const { id } = saveLocalDraft({
+  const draft = saveLocalDraft({
     id: draftDbid.value || undefined,
     title: form.title,
     url: form.url,
@@ -275,15 +304,11 @@ async function saveDraft(silent = false) {
     tags: form.tags,
     notebookId: form.notebookId
   });
-  draftDbid.value = id;
-  draftSaved.value = true;
+  draftDbid.value = draft?.id || draftDbid.value;
   if (!silent) ElMessage.success('已保存为草稿（本地）');
 }
 
-const draftDbid = ref(null);
-const generatedClipId = ref(null);
 async function save() {
-  if (cancelByDup.value) return;
   if (!form.title && !form.text && !form.url) {
     return ElMessage.warning('标题、内容或 URL 至少填写一项');
   }
@@ -305,12 +330,13 @@ async function save() {
     } else {
       const { data } = await clipApi.create(payload);
       if (data.duplicated) {
-        // 用户已确认继续保存
+        ElMessage.info('该链接已存在剪藏，已按你的确认继续保存');
       }
     }
     if (draftDbid.value) {
       removeLocalDraft(draftDbid.value);
     }
+    snapshot.value = JSON.stringify(form);
     ElMessage.success(isEdit.value ? '剪藏已更新' : '剪藏已保存');
     emit('saved');
   } catch (e) {
@@ -318,12 +344,6 @@ async function save() {
   } finally {
     saving.value = false;
   }
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 </script>
 

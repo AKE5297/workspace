@@ -46,18 +46,33 @@
         v-for="tab in tabs"
         :key="tab.path"
         class="tab-item"
-        :class="{ active: activeMenu === tab.path }"
-        @click="goTab(tab.path)"
+        :class="{ active: tabActive(tab) }"
+        @click="goTab(tab)"
       >
         <el-icon :size="22"><component :is="tab.icon" /></el-icon>
         <span>{{ tab.label }}</span>
       </div>
     </nav>
+
+    <el-drawer v-model="moreVisible" direction="btt" size="40%" :with-header="false" class="more-drawer">
+      <div class="more-grid">
+        <div
+          v-for="m in moreMenu"
+          :key="m.path"
+          class="more-item"
+          :class="{ active: activeMenu === m.path }"
+          @click="goMore(m.path)"
+        >
+          <el-icon :size="22"><component :is="m.icon" /></el-icon>
+          <span>{{ m.label }}</span>
+        </div>
+      </div>
+    </el-drawer>
   </el-container>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
@@ -72,23 +87,61 @@ const tabs = [
   { path: '/notebooks', label: '笔记本', icon: 'Folder' },
   { path: '/tags', label: '标签', icon: 'PriceTag' },
   { path: '/favorites', label: '收藏', icon: 'Star' },
-  { path: '/settings', label: '我的', icon: 'User' }
+  { path: '__more__', label: '更多', icon: 'Menu' }
+];
+
+const moreMenu = [
+  { path: '/knowledge', label: '知识库', icon: 'Notebook' },
+  { path: '/rag', label: '智能问答', icon: 'ChatDotRound' },
+  { path: '/drafts', label: '草稿箱', icon: 'EditPen' },
+  { path: '/stats', label: '统计', icon: 'TrendCharts' },
+  { path: '/recycle', label: '回收站', icon: 'Delete' },
+  { path: '/shares', label: '分享管理', icon: 'Share' },
+  { path: '/settings', label: '设置', icon: 'Setting' }
+];
+
+const moreVisible = ref(false);
+
+const menuPaths = [
+  '/clips',
+  '/notebooks',
+  '/tags',
+  '/knowledge',
+  '/rag',
+  '/favorites',
+  '/drafts',
+  '/stats',
+  '/recycle',
+  '/shares',
+  '/settings'
 ];
 
 const activeMenu = computed(() => {
   const p = route.path;
-  if (p.startsWith('/knowledge')) return '/knowledge';
-  if (p.startsWith('/rag')) return '/rag';
-  if (p.startsWith('/notebooks')) return '/notebooks';
-  if (p.startsWith('/tags')) return '/tags';
-  if (p.startsWith('/favorites')) return '/favorites';
-  if (p.startsWith('/settings')) return '/settings';
+  for (const path of menuPaths) {
+    if (p === path || p.startsWith(`${path}/`)) return path;
+  }
+  if (p.startsWith('/clip/')) return '/clips';
   return '/clips';
 });
 
 const initial = computed(() => (auth.user?.username || 'U').charAt(0).toUpperCase());
 
-function goTab(path) {
+function tabActive(tab) {
+  if (tab.path === '__more__') return moreMenu.some((m) => m.path === activeMenu.value);
+  return activeMenu.value === tab.path;
+}
+
+function goTab(tab) {
+  if (tab.path === '__more__') {
+    moreVisible.value = true;
+    return;
+  }
+  router.push(tab.path);
+}
+
+function goMore(path) {
+  moreVisible.value = false;
   router.push(path);
 }
 
@@ -152,6 +205,12 @@ function onCommand(cmd) {
   height: 100vh;
   overflow-y: auto;
 }
+@media (max-width: 768px) {
+  .main-content {
+    /* 为固定底部 Tab 预留空间，避免内容被遮挡 */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
 .mobile-tab {
   position: fixed;
   bottom: 0;
@@ -177,5 +236,30 @@ function onCommand(cmd) {
 }
 .tab-item.active {
   color: var(--el-color-primary);
+}
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px 4px;
+}
+.more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 4px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+}
+.more-item.active {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+.more-item:active {
+  background: var(--el-fill-color-light);
 }
 </style>

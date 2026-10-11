@@ -59,7 +59,7 @@
           <div class="result-meta">
             <span v-if="r.domain">{{ r.domain }}</span>
             <span v-if="r.author">{{ r.author }}</span>
-            <span>{{ formatDate(r.createdAt) }}</span>
+            <span>{{ formatDay(r.createdAt) }}</span>
             <span v-if="r.notebookName" class="nb-tag">{{ r.notebookName }}</span>
           </div>
         </div>
@@ -88,9 +88,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search, StarFilled } from '@element-plus/icons-vue';
+import { Search } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
 import { clipApi, knowledgeApi, notebookApi } from '@/api';
+import { formatDay } from '@/utils/date';
 
 const router = useRouter();
 const stats = ref({});
@@ -107,15 +108,26 @@ const scopeLabel = computed(() => {
   return nb ? `笔记本：${nb.name}` : '全部剪藏';
 });
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function highlight(text) {
   const q = query.value.trim();
-  if (!q || !text) return text;
+  if (!text) return '';
+  const safe = escapeHtml(text);
+  if (!q) return safe;
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   try {
     const re = new RegExp(`(${escaped})`, 'gi');
-    return String(text).replace(re, '<mark class="hl">$1</mark>');
+    return safe.replace(re, '<mark class="hl">$1</mark>');
   } catch (e) {
-    return text;
+    return safe;
   }
 }
 
@@ -129,13 +141,6 @@ function formatChars(n) {
   if (n >= 10000) return (n / 10000).toFixed(1) + ' 万';
   if (n >= 1000) return (n / 1000).toFixed(1) + ' 千';
   return n;
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function renderCharts() {
@@ -226,7 +231,9 @@ async function loadStats() {
     const { data } = await knowledgeApi.stats();
     stats.value = data;
     requestAnimationFrame(renderCharts);
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    ElMessage.warning('知识库统计加载失败，请稍后重试');
+  }
 }
 
 async function doSearch() {

@@ -31,18 +31,22 @@ export function useLocalDrafts() {
   function saveDraft(data) {
     refresh();
     const nowIso = new Date().toISOString();
+    let record;
     if (data.id) {
       const idx = drafts.value.findIndex((d) => d.id === data.id);
       if (idx >= 0) {
         drafts.value[idx] = { ...drafts.value[idx], ...data, updatedAt: nowIso };
+        record = drafts.value[idx];
       } else {
-        drafts.value.push({ id: data.id, ...data, createdAt: nowIso, updatedAt: nowIso });
+        record = { id: data.id, ...data, createdAt: nowIso, updatedAt: nowIso };
+        drafts.value.push(record);
       }
     } else {
-      drafts.value.push({ id: `draft_${Date.now()}`, ...data, createdAt: nowIso, updatedAt: nowIso });
+      record = { id: `draft_${Date.now()}`, ...data, createdAt: nowIso, updatedAt: nowIso };
+      drafts.value.push(record);
     }
     save(drafts.value);
-    return drafts.value[drafts.value.length - 1];
+    return record;
   }
 
   function remove(id) {

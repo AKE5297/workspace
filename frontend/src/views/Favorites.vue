@@ -24,7 +24,7 @@
             <div v-if="clip.summary" class="clip-summary text-ellipsis-2">{{ clip.summary }}</div>
             <div class="clip-meta">
               <span v-if="clip.domain">{{ clip.domain }}</span>
-              <span>{{ formatDate(clip.createdAt) }}</span>
+              <span>{{ formatDay(clip.createdAt) }}</span>
             </div>
             <div v-if="clip.tags && clip.tags.length" class="clip-tags">
               <el-tag v-for="t in clip.tags.slice(0, 4)" :key="t" size="small" type="info">{{ t }}</el-tag>
@@ -42,7 +42,9 @@
 
 <script setup>
 import { onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import { clipApi } from '@/api';
+import { formatDay } from '@/utils/date';
 
 const clips = ref([]);
 const loading = ref(false);
@@ -56,6 +58,8 @@ async function load() {
     const { data } = await clipApi.list({ favorite: 'true', page: page.value, pageSize });
     clips.value = data.items;
     total.value = data.total;
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载收藏失败，请稍后重试');
   } finally {
     loading.value = false;
   }
@@ -64,13 +68,6 @@ async function load() {
 function onPage(p) {
   page.value = p;
   load();
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 onMounted(load);

@@ -23,14 +23,10 @@ const routes = [
       { path: 'stats', name: 'stats', component: () => import('@/views/Stats.vue'), meta: { title: '统计' } },
       { path: 'recycle', name: 'recycle', component: () => import('@/views/Recycle.vue'), meta: { title: '回收站' } },
       { path: 'settings', name: 'settings', component: () => import('@/views/Settings.vue'), meta: { title: '设置' } },
-      { path: 'shares', name: 'shares', component: () => import('@/views/Shares.vue'), meta: { title: '分享管理' } }
+      { path: 'shares', name: 'shares', component: () => import('@/views/Shares.vue'), meta: { title: '分享管理' } },
+      { path: 'clip/:id', name: 'clip-detail', component: () => import('@/views/ClipDetail.vue'), meta: { title: '剪藏详情' } },
+      { path: ':pathMatch(.*)*', redirect: '/clips' }
     ]
-  },
-  {
-    path: '/clip/:id',
-    name: 'clip-detail',
-    component: () => import('@/views/ClipDetail.vue'),
-    meta: { auth: true, title: '剪藏详情' }
   },
   {
     path: '/share/:code',
@@ -47,12 +43,12 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('wc_token');
+  document.title = to.meta.title ? `${to.meta.title} - Web Clipper` : 'Web Clipper';
   if (to.meta.public) {
     if (to.name === 'login' && token) return next('/');
     return next();
   }
   if (!token) return next('/login');
-  document.title = to.meta.title ? `${to.meta.title} - Web Clipper` : 'Web Clipper';
   next();
 });
 

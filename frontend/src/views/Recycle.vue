@@ -25,7 +25,7 @@
             <div class="item-main">
               <div class="item-title text-ellipsis">{{ item.clip?.title || '已删除条目' }}</div>
               <div class="item-meta">
-                <span>删除于 {{ formatDate(item.deletedAt) }}</span>
+                <span>删除于 {{ formatDateTime(item.deletedAt) }}</span>
                 <span>剩余 {{ item.remainDays }} 天</span>
                 <el-tag size="small" type="info">{{ item.clip?.notebookName || '未分类' }}</el-tag>
               </div>
@@ -45,6 +45,7 @@
 import { onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { recycleApi } from '@/api';
+import { formatDateTime } from '@/utils/date';
 
 const items = ref([]);
 const selected = ref([]);
@@ -55,6 +56,9 @@ async function load() {
   try {
     const { data } = await recycleApi.list();
     items.value = data.items;
+    selected.value = selected.value.filter((id) => data.items.some((i) => i.id === id));
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载回收站失败，请稍后重试');
   } finally {
     loading.value = false;
   }
@@ -117,13 +121,6 @@ async function purgeAll() {
   await recycleApi.purgeAll();
   ElMessage.success('回收站已清空');
   load();
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 onMounted(load);

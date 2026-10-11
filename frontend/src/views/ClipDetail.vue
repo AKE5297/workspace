@@ -2,9 +2,9 @@
   <div class="detail-page" v-loading="loading">
     <template v-if="clip">
       <div class="detail-header">
-        <el-button text :icon="ArrowLeft" @click="$router.push('/clips')">返回列表</el-button>
+        <el-button text :icon="ArrowLeft" @click="goBack">返回</el-button>
         <div class="header-actions">
-          <el-button size="small" @click="shareVisible = true" :icon="Share">分享</el-button>
+          <el-button size="small" @click="openShare" :icon="Share">分享</el-button>
           <el-dropdown @command="handleExport">
             <el-button size="small" :icon="Download">
               导出
@@ -41,7 +41,7 @@
         <div class="detail-meta">
           <span v-if="clip.domain">{{ clip.domain }}</span>
           <span v-if="clip.author">作者：{{ clip.author }}</span>
-          <span>保存于 {{ formatDate(clip.createdAt) }}</span>
+          <span>保存于 {{ formatDateTime(clip.createdAt) }}</span>
           <span v-if="clip.readCount">阅读 {{ clip.readCount }} 次</span>
         </div>
         <div v-if="clip.tags && clip.tags.length" class="detail-tags">
@@ -67,9 +67,10 @@
       </div>
     </template>
 
-    <el-drawer v-model="editVisible" title="编辑剪藏" size="min(720px, 92vw)">
+    <el-drawer v-model="editVisible" title="编辑剪藏" size="min(720px, 92vw)" :before-close="confirmCloseEditor">
       <ClipEditor
         v-if="editVisible"
+        ref="editorRef"
         :clip-id="clip.id"
         :initial="clip"
         :notebooks="notebooks"
@@ -119,8 +120,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowLeft, Share, Reading, Star, Link, Document, Download, ArrowDown } from '@element-plus/icons-vue';
 import { marked } from 'marked';
-import { clipApi, notebookApi, shareApi, exportApi } from '@/api';
+import { clipApi, notebookApi, shareApi } from '@/api';
 import api, { resolveAssets } from '@/api/client';
+import { formatDateTime } from '@/utils/date';
 import ClipEditor from '@/components/ClipEditor.vue';
 
 const route = useRoute();
@@ -131,10 +133,12 @@ const loading = ref(true);
 const readingMode = ref(false);
 const markdownView = ref(false);
 const editVisible = ref(false);
+const editorRef = ref(null);
 const shareVisible = ref(false);
 const shareLoading = ref(false);
 const shareLink = ref('');
 const expiresIn = ref(null);
+const shareItem = ref(null);
 
 const renderText = computed(() => {
   if (!clip.value?.text) return '';
@@ -176,6 +180,16 @@ function reload() {
   load();
 }
 
+function confirmCloseEditor(done) {
+  if (editorRef.value?.isDirty?.()) {
+    ElMessageBox.confirm('有未保存的修改，确定放弃？', '放弃修改', { type: 'warning' })
+      .then(() => done())
+      .catch(() => {});
+  } else {
+    done();
+  }
+}
+
 async function toggleFavorite() {
   const { data } = await clipApi.toggleFavorite(clip.value.id);
   clip.value.isFavorite = data.isFavorite;
@@ -193,6 +207,31 @@ async function remove() {
   router.push('/clips');
 }
 
+function goBack() {
+  if (window.history.state && window.history.state.back) {
+    router.back();
+  } else {
+    router.push('/clips');
+  }
+}
+
+async function openShare() {
+  shareVisible.value = true;
+  if (!clip.value) return;
+  try {
+    const { data } = await shareApi.list();
+    const mine = (data.items || []).filter((s) => s.clipId === clip.value.id);
+    shareItem.value = mine.find((s) => s.active) || mine[0] || null;
+    shareLink.value = shareItem.value?.active
+      ? `${window.location.origin}/share/${shareItem.value.code}`
+      : '';
+    expiresIn.value = null;
+  } catch (e) {
+    shareItem.value = null;
+    shareLink.value = '';
+  }
+}
+
 async function createShare() {
   shareLoading.value = true;
   try {
@@ -200,20 +239,21 @@ async function createShare() {
       clipId: clip.value.id,
       expiresIn: expiresIn.value
     });
+    shareItem.value = { id: data.share.id, clipId: clip.value.id, code: data.share.code, active: true };
     shareLink.value = `${window.location.origin}/share/${data.share.code}`;
+    ElMessage.success('分享链接已生成');
   } finally {
     shareLoading.value = false;
   }
 }
 
 async function disableShare() {
-  const { data } = await shareApi.create({ clipId: clip.value.id });
-  // 需要 toggle 关闭
-  const list = await shareApi.list();
-  const item = list.data.items.find((s) => s.clipId === clip.value.id);
-  if (item) {
-    await shareApi.toggle(item.id);
+  if (!shareItem.value) {
+    shareLink.value = '';
+    return;
   }
+  await shareApi.toggle(shareItem.value.id);
+  shareItem.value.active = false;
   shareLink.value = '';
   ElMessage.success('分享已关闭');
 }
@@ -269,13 +309,6 @@ async function handleExport(command) {
   } catch (e) {
     ElMessage.error(`导出失败：${e.response?.data?.message || e.message}`);
   }
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 onMounted(() => {

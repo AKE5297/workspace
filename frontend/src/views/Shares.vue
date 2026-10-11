@@ -16,8 +16,8 @@
               <el-tag :type="s.active ? 'success' : 'danger'" size="small">{{ s.active ? '有效' : '已失效' }}</el-tag>
             </div>
             <div class="share-meta">
-              <span>创建于 {{ formatDate(s.createdAt) }}</span>
-              <span v-if="s.expiresAt">有效期至 {{ formatDate(s.expiresAt) }}</span>
+              <span>创建于 {{ formatDay(s.createdAt) }}</span>
+              <span v-if="s.expiresAt">有效期至 {{ formatDay(s.expiresAt) }}</span>
               <span v-else>永久有效</span>
               <span v-if="s.viewCount">访问 {{ s.viewCount }} 次</span>
             </div>
@@ -38,6 +38,7 @@
 import { onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { shareApi } from '@/api';
+import { formatDay } from '@/utils/date';
 
 const items = ref([]);
 const loading = ref(false);
@@ -49,6 +50,8 @@ async function load() {
   try {
     const { data } = await shareApi.list();
     items.value = data.items;
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载分享列表失败，请稍后重试');
   } finally {
     loading.value = false;
   }
@@ -78,12 +81,6 @@ async function remove(s) {
   await shareApi.remove(s.id);
   ElMessage.success('分享已删除');
   load();
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 onMounted(load);
